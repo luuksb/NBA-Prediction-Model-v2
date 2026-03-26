@@ -43,6 +43,107 @@ features:
     producing_step: assemble
     active: true
 
+  - name: net_rtg_delta
+    description: >
+      Net rating per 100 possessions (offensive rating minus defensive rating):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: efg_pct_delta
+    description: >
+      Effective field goal percentage ((FGM + 0.5 * 3PM) / FGA):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_shooting; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: three_par_delta
+    description: >
+      Three-point attempt rate (3PA / FGA):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_shooting; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: pace_delta
+    description: >
+      Pace (possessions per 48 minutes):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: treb_rate_delta
+    description: >
+      Total rebound rate (TRB / available rebounds):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_rebounding; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: oreb_rate_delta
+    description: >
+      Offensive rebound rate (OREB / available offensive rebounds):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_rebounding; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: tov_rate_delta
+    description: >
+      Turnover rate (TOV per 100 possessions):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: roster_age_delta
+    description: >
+      Roster average age (minutes-weighted):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/roster_age; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: playoff_series_played_delta
+    description: >
+      Sum of total playoff series played (historical, up to but not including current year):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/playoff_experience; delta assembled in assemble.py.
+    type: int
+    producing_step: assemble
+    active: true
+
+  - name: avg_playoff_series_played_delta
+    description: >
+      Average playoff series played per year (historical, up to but not including current year):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/playoff_experience; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  # ── Matchup-level ─────────────────────────────────────────────────────────────
+  - name: homecourt_dummy
+    description: >
+      1 if the higher-seeded team has home-court advantage, 0 otherwise.
+      In standard playoff seeding this is always 1; included as a feature for cases where
+      re-seeding or special circumstances apply.
+      Produced by assemble.py from seeding data.
+    type: int
+    producing_step: assemble
+    active: true
+
   # ── Player-level (top 3 per team) ───────────────────────────────────────────
   - name: bpm_top3_mean_delta
     description: >
@@ -71,6 +172,24 @@ features:
   - name: usage_top3_mean_delta
     description: >
       Mean usage rate of top-3 players: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: ws48_top3_mean_delta
+    description: >
+      Mean Win Shares per 48 minutes (WS/48) of top-3 players:
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: per_top3_mean_delta
+    description: >
+      Mean Player Efficiency Rating (PER) of top-3 players:
+      higher-seeded team minus lower-seeded team.
       Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
     type: float
     producing_step: assemble

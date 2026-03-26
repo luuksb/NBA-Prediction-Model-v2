@@ -40,14 +40,29 @@ All features defined in `configs/features.yaml`. Current initial set:
 **Team-level:**
 - Offensive rating per 100 possessions
 - Defensive rating per 100 possessions
+- Net rating per 100 possessions (offensive rating minus defensive rating)
+- Effective field goal percentage
+- Three-point attempt rate
+- Pace (possessions per 48 minutes)
+- Total rebound rate
+- Offensive rebound rate
+- Turnover rate (per 100 possessions)
+- Roster average age (minutes-weighted)
 - Sum of total playoff series wins (historical, up to but not including current year)
 - Average playoff series wins per year
+- Sum of total playoff series played (historical, up to but not including current year)
+- Average playoff series played per year
+
+**Matchup-level:**
+- Home-court advantage dummy
 
 **Player-level (top 3 per team by configurable ranking metric):**
 - BPM (Box Plus-Minus)
 - EPM (Estimated Plus-Minus)
 - RAPTOR
 - Usage rate
+- WS/48 (Win Shares per 48 minutes)
+- PER (Player Efficiency Rating)
 
 **Coach-level:**
 - Playoff series win percentage (up to but not including current year)
@@ -55,7 +70,7 @@ All features defined in `configs/features.yaml`. Current initial set:
 **Injury-derived (Module 3 output, out-of-sample years only):**
 - Weighted team availability percentage (series-level)
 
-When extending features later: add to `configs/features.yaml` with name, type, description, producing step, and active flag. Then implement the producing step in `src/data/steps/`.
+When extending features later: add to `configs/features.yaml` with name, type, description, producing step, and active flag. Then implement the producing step in `src/data/steps/`. 
 
 ## Key Design Decisions
 
