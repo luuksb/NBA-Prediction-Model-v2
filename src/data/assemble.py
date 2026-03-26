@@ -66,7 +66,36 @@ def assemble_dataset(intermediate_dir: Path = INTERMEDIATE_DIR) -> pd.DataFrame:
             logger.warning("Duplicate columns detected and dropped: %s", dup_cols)
             base = base.drop(columns=dup_cols)
 
-    return base
+    return compute_deltas(base)
+
+
+def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
+    """Replace paired _high/_low columns with a single _delta column each.
+
+    For every column named ``<base>_high`` that has a matching ``<base>_low``
+    column, computes ``<base>_delta = <base>_high - <base>_low`` and drops the
+    originals.  Unmatched ``_high`` or ``_low`` columns are left untouched.
+
+    Args:
+        df: DataFrame that may contain ``_high``/``_low`` column pairs.
+
+    Returns:
+        New DataFrame with delta columns replacing matched pairs.
+    """
+    high_bases = {c[:-5] for c in df.columns if c.endswith("_high")}
+    low_bases = {c[:-4] for c in df.columns if c.endswith("_low")}
+    paired_bases = high_bases & low_bases
+
+    if not paired_bases:
+        return df
+
+    result = df.copy()
+    for base in sorted(paired_bases):
+        result[f"{base}_delta"] = result[f"{base}_high"] - result[f"{base}_low"]
+        result = result.drop(columns=[f"{base}_high", f"{base}_low"])
+        logger.debug("Computed delta column: %s_delta", base)
+
+    return result
 
 
 def save_final_dataset(df: pd.DataFrame, output_dir: Path = FINAL_DIR) -> Path:

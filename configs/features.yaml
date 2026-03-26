@@ -1,147 +1,100 @@
 # Master feature registry
 # Each feature has: name, description, type, producing_step, active flag
 # Toggle active: false to exclude a feature from model selection without deleting it.
+#
+# Convention: all features are (high_seed_value - low_seed_value).
+# Intermediate steps in steps/ compute per-team values; assemble.py computes the deltas.
 
 features:
 
   # ── Team-level ──────────────────────────────────────────────────────────────
-  - name: off_rtg_high
-    description: Offensive rating per 100 possessions for the higher-seeded team
-    type: float
-    producing_step: steps/team_ratings
-    active: true
-
-  - name: def_rtg_high
-    description: Defensive rating per 100 possessions for the higher-seeded team
-    type: float
-    producing_step: steps/team_ratings
-    active: true
-
-  - name: off_rtg_low
-    description: Offensive rating per 100 possessions for the lower-seeded team
-    type: float
-    producing_step: steps/team_ratings
-    active: true
-
-  - name: def_rtg_low
-    description: Defensive rating per 100 possessions for the lower-seeded team
-    type: float
-    producing_step: steps/team_ratings
-    active: true
-
-  - name: playoff_series_wins_high
+  - name: off_rtg_delta
     description: >
-      Sum of total playoff series wins for the higher-seeded team,
-      historical up to but not including current year
+      Offensive rating per 100 possessions: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/team_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: def_rtg_delta
+    description: >
+      Defensive rating per 100 possessions: higher-seeded team minus lower-seeded team.
+      Positive value means high seed has a worse defense; interpret accordingly.
+      Intermediate per-team values produced by steps/team_ratings; delta assembled in assemble.py.
+    type: float
+    producing_step: assemble
+    active: true
+
+  - name: playoff_series_wins_delta
+    description: >
+      Sum of total playoff series wins (historical, up to but not including current year):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/playoff_experience; delta assembled in assemble.py.
     type: int
-    producing_step: steps/playoff_experience
+    producing_step: assemble
     active: true
 
-  - name: playoff_series_wins_low
+  - name: avg_playoff_series_wins_delta
     description: >
-      Sum of total playoff series wins for the lower-seeded team,
-      historical up to but not including current year
-    type: int
-    producing_step: steps/playoff_experience
-    active: true
-
-  - name: avg_playoff_series_wins_high
-    description: >
-      Average playoff series wins per year for the higher-seeded team,
-      historical up to but not including current year
+      Average playoff series wins per year (historical, up to but not including current year):
+      higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/playoff_experience; delta assembled in assemble.py.
     type: float
-    producing_step: steps/playoff_experience
-    active: true
-
-  - name: avg_playoff_series_wins_low
-    description: >
-      Average playoff series wins per year for the lower-seeded team,
-      historical up to but not including current year
-    type: float
-    producing_step: steps/playoff_experience
+    producing_step: assemble
     active: true
 
   # ── Player-level (top 3 per team) ───────────────────────────────────────────
-  - name: bpm_top3_mean_high
-    description: Mean BPM of top-3 players for the higher-seeded team
+  - name: bpm_top3_mean_delta
+    description: >
+      Mean BPM of top-3 players: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
     type: float
-    producing_step: steps/player_ratings
+    producing_step: assemble
     active: true
 
-  - name: bpm_top3_mean_low
-    description: Mean BPM of top-3 players for the lower-seeded team
+  - name: epm_top3_mean_delta
+    description: >
+      Mean EPM of top-3 players: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
     type: float
-    producing_step: steps/player_ratings
+    producing_step: assemble
     active: true
 
-  - name: epm_top3_mean_high
-    description: Mean EPM of top-3 players for the higher-seeded team
+  - name: raptor_top3_mean_delta
+    description: >
+      Mean RAPTOR of top-3 players: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
     type: float
-    producing_step: steps/player_ratings
+    producing_step: assemble
     active: true
 
-  - name: epm_top3_mean_low
-    description: Mean EPM of top-3 players for the lower-seeded team
+  - name: usage_top3_mean_delta
+    description: >
+      Mean usage rate of top-3 players: higher-seeded team minus lower-seeded team.
+      Intermediate per-team values produced by steps/player_ratings; delta assembled in assemble.py.
     type: float
-    producing_step: steps/player_ratings
-    active: true
-
-  - name: raptor_top3_mean_high
-    description: Mean RAPTOR of top-3 players for the higher-seeded team
-    type: float
-    producing_step: steps/player_ratings
-    active: true
-
-  - name: raptor_top3_mean_low
-    description: Mean RAPTOR of top-3 players for the lower-seeded team
-    type: float
-    producing_step: steps/player_ratings
-    active: true
-
-  - name: usage_top3_mean_high
-    description: Mean usage rate of top-3 players for the higher-seeded team
-    type: float
-    producing_step: steps/player_ratings
-    active: true
-
-  - name: usage_top3_mean_low
-    description: Mean usage rate of top-3 players for the lower-seeded team
-    type: float
-    producing_step: steps/player_ratings
+    producing_step: assemble
     active: true
 
   # ── Coach-level ──────────────────────────────────────────────────────────────
-  - name: coach_series_win_pct_high
+  - name: coach_series_win_pct_delta
     description: >
-      Playoff series win percentage for the higher-seeded team's coach,
-      up to but not including current year
+      Playoff series win percentage (up to but not including current year):
+      higher-seeded team's coach minus lower-seeded team's coach.
+      Intermediate per-team values produced by steps/coach_experience; delta assembled in assemble.py.
     type: float
-    producing_step: steps/coach_experience
-    active: true
-
-  - name: coach_series_win_pct_low
-    description: >
-      Playoff series win percentage for the lower-seeded team's coach,
-      up to but not including current year
-    type: float
-    producing_step: steps/coach_experience
+    producing_step: assemble
     active: true
 
   # ── Injury-derived (Module 3 output — out-of-sample years only) ──────────────
-  - name: availability_pct_high
+  - name: availability_pct_delta
     description: >
-      Weighted team availability percentage (games played / expected) for the higher-seeded
-      team's top-3 players in this series. Actual values for historical years;
-      simulated values for 2025/2026.
+      Weighted team availability percentage (games played / expected for top-3 players):
+      higher-seeded team minus lower-seeded team.
+      Actual values for historical years; simulated values for 2025/2026.
+      Per-team values produced by injury_module; delta assembled in assemble.py.
     type: float
-    producing_step: injury_module
-    active: true
-
-  - name: availability_pct_low
-    description: >
-      Weighted team availability percentage for the lower-seeded team's top-3 players.
-    type: float
-    producing_step: injury_module
+    producing_step: assemble
     active: true
 
 # ── Top-player ranking weights ─────────────────────────────────────────────────
