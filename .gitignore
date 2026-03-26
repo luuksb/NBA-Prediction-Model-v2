@@ -13,14 +13,24 @@ build/
 venv/
 env/
 
-# Data — raw inputs are immutable and large; never commit them
-data/raw/
-data/intermediate/
-data/final/
-data/quality_reports/
+# Data — raw inputs are immutable and large; never commit their contents
+data/raw/*
+data/intermediate/*
+data/final/*
+data/quality_reports/*
+# Keep directory structure via .gitkeep
+!data/raw/.gitkeep
+!data/intermediate/.gitkeep
+!data/final/.gitkeep
+!data/quality_reports/.gitkeep
 
-# Results — generated outputs; track selectively via DVC or manually
-results/
+# Results — generated outputs; keep directory structure only
+results/model_selection/*
+results/simulations/*
+results/injury_sims/*
+!results/model_selection/.gitkeep
+!results/simulations/.gitkeep
+!results/injury_sims/.gitkeep
 
 # Notebooks checkpoints
 .ipynb_checkpoints/
