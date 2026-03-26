@@ -36,18 +36,23 @@ def get_active_features() -> list[str]:
     return [f["name"] for f in feat_cfg["features"] if f.get("active", True)]
 
 
-def generate_all_subsets(features: list[str], max_size: int) -> list[list[str]]:
-    """Generate all non-empty subsets of features up to max_size.
+def generate_all_subsets(
+    features: list[str],
+    max_size: int,
+    min_size: int = 1,
+) -> list[list[str]]:
+    """Generate all subsets of features with sizes in [min_size, max_size].
 
     Args:
         features: Pool of available feature names.
-        max_size: Maximum number of features per subset.
+        max_size: Maximum number of features per subset (inclusive).
+        min_size: Minimum number of features per subset (inclusive).
 
     Returns:
         List of feature subsets (each subset is a sorted list of names).
     """
     result: list[list[str]] = []
-    for size in range(1, min(max_size, len(features)) + 1):
+    for size in range(min_size, min(max_size, len(features)) + 1):
         for combo in combinations(features, size):
             result.append(sorted(combo))
     return result

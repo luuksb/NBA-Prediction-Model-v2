@@ -20,7 +20,7 @@ from src.model.fit import ModelSpec, predict_proba
 logger = logging.getLogger(__name__)
 
 MODEL_SELECTION_CONFIG = Path("configs/model_selection.yaml")
-TARGET_COL = "high_seed_wins"
+TARGET_COL = "higher_seed_wins"
 
 
 def _load_ms_config() -> dict:
@@ -128,3 +128,46 @@ def build_leaderboard(
     )
 
     return leaderboard.sort_values("composite_score", ascending=False).reset_index(drop=True)
+
+
+# Ascending=True means lower is better for that metric.
+_METRIC_SORT_ASCENDING: dict[str, bool] = {
+    "mcfadden_r2": False,
+    "brier_score": True,
+    "auc_roc": False,
+    "log_loss": True,
+}
+
+
+def build_window_metric_leaderboards(
+    rows: list[dict],
+    top_n: int = 5,
+) -> dict[str, dict[str, pd.DataFrame]]:
+    """Build top-N leaderboards for each training window × metric pair.
+
+    Args:
+        rows: List of metric dicts returned by evaluate_model(), one per fitted model.
+        top_n: Number of top models to retain per leaderboard.
+
+    Returns:
+        Nested dict ``{window_name: {metric_name: DataFrame}}``.
+        Each DataFrame contains columns ``features``, ``n_features``, ``<metric>``,
+        and ``n_obs``. The index is 1-based rank.
+    """
+    all_rows_df = pd.DataFrame(rows)
+    all_rows_df["n_features"] = all_rows_df["features"].apply(len)
+
+    result: dict[str, dict[str, pd.DataFrame]] = {}
+    for window in sorted(all_rows_df["window"].unique()):
+        window_df = all_rows_df[all_rows_df["window"] == window].copy()
+        result[window] = {}
+        for metric, ascending in _METRIC_SORT_ASCENDING.items():
+            top = (
+                window_df[["features", "n_features", metric, "n_obs"]]
+                .sort_values(metric, ascending=ascending)
+                .head(top_n)
+                .reset_index(drop=True)
+            )
+            top.index = top.index + 1  # 1-based rank
+            result[window][metric] = top
+    return result
