@@ -1,0 +1,66 @@
+# Model selection parameters
+
+# Maximum number of features in a candidate feature set
+max_feature_set_size: 6
+
+# How many top models to retain per metric (and overall)
+top_n_models: 5
+
+# Composite ranking metric weights
+# Must sum to 1.0
+composite_weights:
+  mcfadden_r2: 0.25
+  brier_score: 0.25   # lower is better — negated before weighting
+  auc_roc: 0.25
+  log_loss: 0.25      # lower is better — negated before weighting
+
+# Calibration check: flag models whose max calibration error exceeds this threshold
+max_calibration_error: 0.05
+
+# Feature set generation strategy
+# Options: "all_subsets" | "curated_groups" | "both"
+feature_set_strategy: both
+
+# Curated feature groups (evaluated as complete sets, not subsets)
+curated_groups:
+  - name: team_only
+    features:
+      - off_rtg_high
+      - def_rtg_high
+      - off_rtg_low
+      - def_rtg_low
+      - playoff_series_wins_high
+      - playoff_series_wins_low
+
+  - name: team_plus_players
+    features:
+      - off_rtg_high
+      - def_rtg_high
+      - off_rtg_low
+      - def_rtg_low
+      - bpm_top3_mean_high
+      - bpm_top3_mean_low
+
+  - name: full_no_injury
+    features:
+      - off_rtg_high
+      - def_rtg_high
+      - off_rtg_low
+      - def_rtg_low
+      - bpm_top3_mean_high
+      - bpm_top3_mean_low
+      - coach_series_win_pct_high
+      - coach_series_win_pct_low
+
+  - name: full_with_injury
+    features:
+      - off_rtg_high
+      - def_rtg_high
+      - off_rtg_low
+      - def_rtg_low
+      - bpm_top3_mean_high
+      - bpm_top3_mean_low
+      - coach_series_win_pct_high
+      - coach_series_win_pct_low
+      - availability_pct_high
+      - availability_pct_low

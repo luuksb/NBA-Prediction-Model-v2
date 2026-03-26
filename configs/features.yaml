@@ -1,0 +1,153 @@
+# Master feature registry
+# Each feature has: name, description, type, producing_step, active flag
+# Toggle active: false to exclude a feature from model selection without deleting it.
+
+features:
+
+  # ── Team-level ──────────────────────────────────────────────────────────────
+  - name: off_rtg_high
+    description: Offensive rating per 100 possessions for the higher-seeded team
+    type: float
+    producing_step: steps/team_ratings
+    active: true
+
+  - name: def_rtg_high
+    description: Defensive rating per 100 possessions for the higher-seeded team
+    type: float
+    producing_step: steps/team_ratings
+    active: true
+
+  - name: off_rtg_low
+    description: Offensive rating per 100 possessions for the lower-seeded team
+    type: float
+    producing_step: steps/team_ratings
+    active: true
+
+  - name: def_rtg_low
+    description: Defensive rating per 100 possessions for the lower-seeded team
+    type: float
+    producing_step: steps/team_ratings
+    active: true
+
+  - name: playoff_series_wins_high
+    description: >
+      Sum of total playoff series wins for the higher-seeded team,
+      historical up to but not including current year
+    type: int
+    producing_step: steps/playoff_experience
+    active: true
+
+  - name: playoff_series_wins_low
+    description: >
+      Sum of total playoff series wins for the lower-seeded team,
+      historical up to but not including current year
+    type: int
+    producing_step: steps/playoff_experience
+    active: true
+
+  - name: avg_playoff_series_wins_high
+    description: >
+      Average playoff series wins per year for the higher-seeded team,
+      historical up to but not including current year
+    type: float
+    producing_step: steps/playoff_experience
+    active: true
+
+  - name: avg_playoff_series_wins_low
+    description: >
+      Average playoff series wins per year for the lower-seeded team,
+      historical up to but not including current year
+    type: float
+    producing_step: steps/playoff_experience
+    active: true
+
+  # ── Player-level (top 3 per team) ───────────────────────────────────────────
+  - name: bpm_top3_mean_high
+    description: Mean BPM of top-3 players for the higher-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: bpm_top3_mean_low
+    description: Mean BPM of top-3 players for the lower-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: epm_top3_mean_high
+    description: Mean EPM of top-3 players for the higher-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: epm_top3_mean_low
+    description: Mean EPM of top-3 players for the lower-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: raptor_top3_mean_high
+    description: Mean RAPTOR of top-3 players for the higher-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: raptor_top3_mean_low
+    description: Mean RAPTOR of top-3 players for the lower-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: usage_top3_mean_high
+    description: Mean usage rate of top-3 players for the higher-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  - name: usage_top3_mean_low
+    description: Mean usage rate of top-3 players for the lower-seeded team
+    type: float
+    producing_step: steps/player_ratings
+    active: true
+
+  # ── Coach-level ──────────────────────────────────────────────────────────────
+  - name: coach_series_win_pct_high
+    description: >
+      Playoff series win percentage for the higher-seeded team's coach,
+      up to but not including current year
+    type: float
+    producing_step: steps/coach_experience
+    active: true
+
+  - name: coach_series_win_pct_low
+    description: >
+      Playoff series win percentage for the lower-seeded team's coach,
+      up to but not including current year
+    type: float
+    producing_step: steps/coach_experience
+    active: true
+
+  # ── Injury-derived (Module 3 output — out-of-sample years only) ──────────────
+  - name: availability_pct_high
+    description: >
+      Weighted team availability percentage (games played / expected) for the higher-seeded
+      team's top-3 players in this series. Actual values for historical years;
+      simulated values for 2025/2026.
+    type: float
+    producing_step: injury_module
+    active: true
+
+  - name: availability_pct_low
+    description: >
+      Weighted team availability percentage for the lower-seeded team's top-3 players.
+    type: float
+    producing_step: injury_module
+    active: true
+
+# ── Top-player ranking weights ─────────────────────────────────────────────────
+# Used by both Module 1 (feature construction) and Module 3 (injury sim)
+top_player_ranking:
+  n_players: 3
+  weights:
+    bpm: 0.5
+    raptor: 0.5

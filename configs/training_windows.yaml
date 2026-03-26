@@ -1,0 +1,22 @@
+# Training window definitions
+# Adding a new window here is the only change needed to include it in model selection.
+
+windows:
+  - name: full
+    start_year: 1980
+    end_year: 2024
+    description: Full historical record (1980–2024)
+
+  - name: modern
+    start_year: 2000
+    end_year: 2024
+    description: Modern era (2000–2024)
+
+  - name: recent
+    start_year: 2014
+    end_year: 2024
+    description: Recent era (2014–2024)
+
+# Out-of-sample years
+validation_year: 2025
+prediction_year: 2026
