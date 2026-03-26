@@ -74,7 +74,6 @@ def fetch_bref_once(url: str) -> pd.DataFrame | None:
         DataFrame of the first HTML table found, or None on failure.
     """
     import requests
-    from bs4 import BeautifulSoup  # type: ignore[import]
 
     logger.info("Attempting one-shot Basketball Reference scrape: %s", url)
     try:
@@ -89,8 +88,7 @@ def fetch_bref_once(url: str) -> pd.DataFrame | None:
         )
         return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    tables = pd.read_html(str(soup), flavor="bs4")
+    tables = pd.read_html(resp.text)
     if not tables:
         logger.warning("No tables found at %s. Returning None.", url)
         return None
