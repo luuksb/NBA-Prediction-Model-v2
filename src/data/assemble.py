@@ -1,9 +1,16 @@
-"""assemble.py — Join all intermediate step outputs into the final series dataset.
+"""assemble.py — Orchestrate the data pipeline and build the final series dataset.
 
-Reads intermediate parquet files produced by steps/ and joins them into
-data/final/series_dataset.parquet (one row per historical playoff series).
+Pipeline stages:
+  1. load_base_series()  — reads all playoff_series/*.csv into one base DataFrame
+  2. run_all_steps()     — runs every feature-engineering step, saves intermediates
+  3. _join_intermediates() — merges all intermediate parquets on (season, series_id)
+  4. compute_deltas()    — converts *_high / *_low column pairs → delta_* columns
+  5. save_final_dataset() — writes data/final/series_dataset.parquet
 
-Columns in the final dataset are registered in configs/features.yaml.
+Final dataset columns:
+  series_id, year (= season), higher_seed_wins,
+  team_high, team_low, round, conference,
+  and all delta_* feature columns.
 """
 
 from __future__ import annotations
@@ -16,90 +23,306 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+RAW_DIR = Path("data/raw")
+PLAYOFF_SERIES_DIR = RAW_DIR / "playoff_series"
 INTERMEDIATE_DIR = Path("data/intermediate")
 FINAL_DIR = Path("data/final")
 FEATURES_CONFIG = Path("configs/features.yaml")
 
-
-def load_active_features() -> list[str]:
-    """Return the list of feature names that are active in configs/features.yaml.
-
-    Returns:
-        Sorted list of active feature name strings.
-    """
-    with open(FEATURES_CONFIG) as f:
-        config = yaml.safe_load(f)
-    return [feat["name"] for feat in config["features"] if feat.get("active", True)]
+FIRST_SEASON = 1980
+LAST_SEASON = 2024
 
 
-def assemble_dataset(intermediate_dir: Path = INTERMEDIATE_DIR) -> pd.DataFrame:
-    """Join all intermediate step outputs into the final series-level DataFrame.
+# ── Base series ────────────────────────────────────────────────────────────────
 
-    Each step writes a parquet file to data/intermediate/. This function reads
-    all of them and joins on (year, series_id) to produce one row per series.
+def load_base_series(
+    raw_dir: Path = RAW_DIR,
+    first_season: int = FIRST_SEASON,
+    last_season: int = LAST_SEASON,
+) -> pd.DataFrame:
+    """Load all playoff series CSVs and return a base DataFrame.
+
+    Each row represents one historical playoff series. The series_id is already
+    in YYYY_TM1_TM2 format where TM1 is the higher seed.
 
     Args:
-        intermediate_dir: Directory containing per-step parquet outputs.
+        raw_dir: Root raw data directory.
+        first_season: Earliest season to include (inclusive).
+        last_season: Latest season to include (inclusive).
 
     Returns:
-        DataFrame with one row per playoff series and all feature columns.
+        DataFrame with columns:
+          series_id, season, team_high, team_low,
+          higher_seed_wins, round, conference, seed_high, seed_low.
+    """
+    series_dir = raw_dir / "playoff_series"
+    frames: list[pd.DataFrame] = []
+    for path in sorted(series_dir.glob("*_nba_api.csv")):
+        year = int(path.stem.split("_")[0])
+        if year < first_season or year > last_season:
+            continue
+        df = pd.read_csv(
+            path,
+            usecols=[
+                "season", "series_id", "round", "conference",
+                "team_high", "team_low", "seed_high", "seed_low",
+                "higher_seed_wins",
+            ],
+        )
+        frames.append(df)
+
+    if not frames:
+        raise FileNotFoundError(
+            f"No playoff series CSVs found in {series_dir} "
+            f"for seasons {first_season}–{last_season}."
+        )
+
+    base = pd.concat(frames, ignore_index=True)
+
+    # Validate: series_id should be unique (one row per series)
+    n_dupes = base.duplicated(subset="series_id").sum()
+    if n_dupes > 0:
+        logger.warning(
+            "load_base_series: %d duplicate series_id values found — "
+            "keeping first occurrence.",
+            n_dupes,
+        )
+        base = base.drop_duplicates(subset="series_id", keep="first")
+
+    # Validate: higher_seed_wins must be 0 or 1
+    invalid = ~base["higher_seed_wins"].isin([0, 1])
+    if invalid.any():
+        logger.warning(
+            "load_base_series: %d rows with unexpected higher_seed_wins values.",
+            invalid.sum(),
+        )
+
+    logger.info(
+        "load_base_series: %d series loaded (%d–%d), %d seasons.",
+        len(base),
+        int(base["season"].min()),
+        int(base["season"].max()),
+        int(base["season"].nunique()),
+    )
+    return base.reset_index(drop=True)
+
+
+# ── Step runner ────────────────────────────────────────────────────────────────
+
+def _save_intermediate(df: pd.DataFrame, name: str, out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{name}.parquet"
+    df.to_parquet(path, index=False)
+    logger.info("Saved intermediate: %s  (%d rows, %d cols)", path, len(df), len(df.columns))
+
+
+def run_all_steps(
+    base: pd.DataFrame,
+    intermediate_dir: Path = INTERMEDIATE_DIR,
+) -> None:
+    """Run all feature-engineering steps and save outputs to intermediate_dir.
+
+    Steps run in order:
+      1. team_ratings     — delta team efficiency stats
+      2. playoff_experience — cumulative series wins / experience
+      3. player_availability — top-3 GP% delta
+      4. player_ratings   — star BPM / PER / USG + availability weights
+      5. coach_experience — coach series win %
+
+    Each step receives the base series DataFrame and returns it augmented with
+    new columns. Only the keys (series_id, season) plus the step's new columns
+    are saved to the intermediate parquet.
+
+    Args:
+        base: Output of load_base_series().
+        intermediate_dir: Directory to write per-step parquet files.
+    """
+    # Import steps lazily so this module stays importable without all deps
+    from src.data.steps import (  # noqa: F401
+        team_ratings,
+        playoff_experience,
+        player_availability,
+        player_ratings,
+        coach_experience,
+    )
+
+    key_cols = ["season", "series_id"]
+
+    steps = [
+        ("team_ratings", team_ratings.run),
+        ("playoff_experience", playoff_experience.run),
+        ("player_availability", player_availability.run),
+        ("player_ratings", player_ratings.run),
+        ("coach_experience", coach_experience.run),
+    ]
+
+    for step_name, step_fn in steps:
+        logger.info("Running step: %s", step_name)
+        augmented = step_fn(base)
+
+        # Identify new columns added by this step
+        new_cols = [c for c in augmented.columns if c not in base.columns]
+        if not new_cols:
+            logger.warning("Step %s added no new columns — skipping save.", step_name)
+            continue
+
+        intermediate = augmented[key_cols + new_cols].copy()
+        _save_intermediate(intermediate, step_name, intermediate_dir)
+        logger.info(
+            "Step %s: added %d columns (%s…)",
+            step_name, len(new_cols), new_cols[:3],
+        )
+
+
+# ── Intermediate joiner ────────────────────────────────────────────────────────
+
+def _join_intermediates(
+    base: pd.DataFrame,
+    intermediate_dir: Path = INTERMEDIATE_DIR,
+) -> pd.DataFrame:
+    """Join all intermediate parquets onto the base series DataFrame.
+
+    Args:
+        base: Base series DataFrame (from load_base_series).
+        intermediate_dir: Directory containing per-step parquet files.
+
+    Returns:
+        Merged DataFrame with base metadata + all step features.
     """
     parquet_files = sorted(intermediate_dir.glob("*.parquet"))
     if not parquet_files:
         raise FileNotFoundError(
-            f"No parquet files found in {intermediate_dir}. "
-            "Run the data pipeline steps first."
+            f"No intermediate parquets found in {intermediate_dir}. "
+            "Run run_all_steps() first."
         )
 
-    dfs = []
+    join_keys = ["season", "series_id"]
+    result = base.copy()
+
     for path in parquet_files:
-        logger.info("Loading intermediate file: %s", path)
-        dfs.append(pd.read_parquet(path))
-
-    # All intermediate frames must share the join keys.
-    join_keys = ["year", "series_id"]
-    base, *rest = dfs
-    for df in rest:
-        base = base.merge(df, on=join_keys, how="outer", suffixes=("", "_dup"))
-        dup_cols = [c for c in base.columns if c.endswith("_dup")]
+        logger.info("Joining intermediate: %s", path.name)
+        step_df = pd.read_parquet(path)
+        result = result.merge(step_df, on=join_keys, how="left", suffixes=("", "_dup"))
+        dup_cols = [c for c in result.columns if c.endswith("_dup")]
         if dup_cols:
-            logger.warning("Duplicate columns detected and dropped: %s", dup_cols)
-            base = base.drop(columns=dup_cols)
+            logger.warning("Duplicate columns dropped after joining %s: %s", path.name, dup_cols)
+            result = result.drop(columns=dup_cols)
 
-    return compute_deltas(base)
+    # Validate row count
+    if len(result) != len(base):
+        raise RuntimeError(
+            f"STOP CONDITION: merge produced {len(result)} rows but base has "
+            f"{len(base)} rows. Investigate the join keys."
+        )
 
-
-def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
-    """Replace paired _high/_low columns with a single _delta column each.
-
-    For every column named ``<base>_high`` that has a matching ``<base>_low``
-    column, computes ``<base>_delta = <base>_high - <base>_low`` and drops the
-    originals.  Unmatched ``_high`` or ``_low`` columns are left untouched.
-
-    Args:
-        df: DataFrame that may contain ``_high``/``_low`` column pairs.
-
-    Returns:
-        New DataFrame with delta columns replacing matched pairs.
-    """
-    high_bases = {c[:-5] for c in df.columns if c.endswith("_high")}
-    low_bases = {c[:-4] for c in df.columns if c.endswith("_low")}
-    paired_bases = high_bases & low_bases
-
-    if not paired_bases:
-        return df
-
-    result = df.copy()
-    for base in sorted(paired_bases):
-        result[f"{base}_delta"] = result[f"{base}_high"] - result[f"{base}_low"]
-        result = result.drop(columns=[f"{base}_high", f"{base}_low"])
-        logger.debug("Computed delta column: %s_delta", base)
-
+    logger.info(
+        "_join_intermediates: %d rows, %d columns after all joins.",
+        len(result), len(result.columns),
+    )
     return result
 
 
+# ── Delta computation ──────────────────────────────────────────────────────────
+
+def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert all *_high / *_low column pairs into delta_* columns.
+
+    For every column named X_high that has a corresponding X_low, computes:
+        delta_X = X_high − X_low
+
+    Columns that already start with 'delta_' are left as-is.
+    After computing all deltas, the original *_high and *_low columns are dropped.
+
+    Special case: top3_gp_pct_delta is already a delta and kept unchanged.
+
+    Args:
+        df: DataFrame containing *_high and *_low column pairs.
+
+    Returns:
+        df with delta_* columns replacing the *_high / *_low columns.
+    """
+    df = df.copy()
+    high_cols = [c for c in df.columns if c.endswith("_high")]
+    paired_bases = [c[: -len("_high")] for c in high_cols if c[: -len("_high")] + "_low" in df.columns]
+
+    cols_to_drop: list[str] = []
+    for base_name in paired_bases:
+        high_col = f"{base_name}_high"
+        low_col = f"{base_name}_low"
+        delta_col = f"delta_{base_name}"
+
+        if delta_col not in df.columns:
+            h = pd.to_numeric(df[high_col], errors="coerce")
+            l = pd.to_numeric(df[low_col], errors="coerce")
+            df[delta_col] = h - l
+
+        cols_to_drop.extend([high_col, low_col])
+
+    df = df.drop(columns=cols_to_drop, errors="ignore")
+
+    n_deltas = sum(1 for c in df.columns if c.startswith("delta_") or c == "top3_gp_pct_delta")
+    logger.info(
+        "compute_deltas: %d *_high/*_low pairs converted; %d delta features total.",
+        len(paired_bases), n_deltas,
+    )
+    return df
+
+
+# ── Public assembly entrypoint ────────────────────────────────────────────────
+
+def assemble_dataset(
+    raw_dir: Path = RAW_DIR,
+    intermediate_dir: Path = INTERMEDIATE_DIR,
+) -> pd.DataFrame:
+    """Run the full data pipeline and return the final series-level DataFrame.
+
+    Steps:
+      1. Load base series data from playoff_series/*.csv.
+      2. Run all feature-engineering steps and save to intermediate/.
+      3. Join all intermediates onto base.
+      4. Compute delta_* features from *_high / *_low pairs.
+      5. Rename season → year; retain metadata + delta features only.
+
+    Returns:
+        DataFrame with one row per historical playoff series. Columns:
+          series_id, year, higher_seed_wins, team_high, team_low,
+          round, conference, seed_high, seed_low,
+          and all delta_* / top3_gp_pct_delta feature columns.
+    """
+    base = load_base_series(raw_dir=raw_dir)
+    run_all_steps(base, intermediate_dir=intermediate_dir)
+    joined = _join_intermediates(base, intermediate_dir=intermediate_dir)
+    final = compute_deltas(joined)
+
+    # Rename season → year (data contract)
+    final = final.rename(columns={"season": "year"})
+
+    # Drop any residual non-feature numeric columns that aren't metadata
+    # Drop any delta columns that are entirely NaN — these are artefacts from
+    # non-numeric metadata columns (e.g. delta_team from team string subtraction)
+    # or columns never populated in the raw data (e.g. delta_seed when seeds are NaN).
+    all_nan_cols = [c for c in final.columns if c.startswith("delta_") and final[c].isna().all()]
+    if all_nan_cols:
+        logger.warning(
+            "Dropping %d all-NaN delta columns: %s", len(all_nan_cols), all_nan_cols
+        )
+        final = final.drop(columns=all_nan_cols)
+
+    keep_meta = {"series_id", "year", "higher_seed_wins", "team_high", "team_low",
+                 "round", "conference"}
+    feature_cols = [c for c in final.columns if c not in keep_meta]
+    final = final[sorted(keep_meta & set(final.columns)) + sorted(feature_cols)]
+
+    logger.info(
+        "assemble_dataset: final shape %d rows × %d cols  "
+        "(%d feature columns).",
+        len(final), len(final.columns), len(feature_cols),
+    )
+    return final
+
+
 def save_final_dataset(df: pd.DataFrame, output_dir: Path = FINAL_DIR) -> Path:
-    """Persist the assembled dataset to data/final/series_dataset.parquet.
+    """Persist the assembled dataset to data/final/series_dataset.parquet and .xlsx.
 
     Args:
         df: Assembled series-level DataFrame.
@@ -109,7 +332,24 @@ def save_final_dataset(df: pd.DataFrame, output_dir: Path = FINAL_DIR) -> Path:
         Path to the written parquet file.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
+
     out_path = output_dir / "series_dataset.parquet"
     df.to_parquet(out_path, index=False)
     logger.info("Saved final dataset to %s  (%d rows, %d cols)", out_path, len(df), len(df.columns))
+
+    xlsx_path = output_dir / "series_dataset.xlsx"
+    df.to_excel(xlsx_path, index=False, engine="openpyxl")
+    logger.info("Saved final dataset to %s", xlsx_path)
+
     return out_path
+
+
+def load_active_features() -> list[str]:
+    """Return active feature names from configs/features.yaml.
+
+    Returns:
+        Sorted list of active feature name strings.
+    """
+    with open(FEATURES_CONFIG) as f:
+        config = yaml.safe_load(f)
+    return [feat["name"] for feat in config["features"] if feat.get("active", True)]
