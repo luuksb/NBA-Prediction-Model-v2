@@ -11,8 +11,10 @@ leaderboards (3 windows × 4 metrics, top 5 each) for human review.
 
 from __future__ import annotations
 
+import io
 import json
 import logging
+import sys
 import warnings
 from math import comb
 from pathlib import Path
@@ -22,7 +24,12 @@ import yaml
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from src.model.evaluate import build_window_metric_leaderboards, evaluate_model
-from src.model.feature_sets import generate_all_subsets, get_active_features
+from src.model.feature_sets import (
+    filter_forbidden_pairs,
+    generate_all_subsets,
+    get_active_features,
+    get_forbidden_pairs,
+)
 from src.model.fit import ModelSpec, fit_logit
 
 logger = logging.getLogger(__name__)
@@ -34,11 +41,11 @@ _MODEL_SELECTION_CONFIG = Path("configs/model_selection.yaml")
 _TARGET_COL = "higher_seed_wins"
 
 # Combination size range for the combinatorial search (per task spec).
-_COMBO_MIN_SIZE = 2
+_COMBO_MIN_SIZE = 4
 _COMBO_MAX_SIZE = 5
 
 # Stop-condition thresholds.
-_MAX_COMBINATIONS = 10_000
+_MAX_COMBINATIONS = 50_000
 _MIN_WINDOW_SERIES = 30
 _MAX_CONVERGENCE_FAILURE_RATE = 0.20
 
@@ -193,30 +200,39 @@ def run_combinatorial_pipeline(
     for feat in active:
         print(f"   - {feat}")
 
-    # ── Step 2: Generate combinations and check stop condition ────────────────
+    # ── Step 2: Generate combinations, apply forbidden-pair filter, stop check ──
     n = len(active)
-    total_combos = sum(comb(n, k) for k in range(min_size, min(max_size, n) + 1))
+    raw_combos = sum(comb(n, k) for k in range(min_size, min(max_size, n) + 1))
     logger.info(
-        "Combination count: C(%d, %d..%d) = %d", n, min_size, max_size, total_combos
+        "Raw combination count: C(%d, %d..%d) = %d", n, min_size, max_size, raw_combos
+    )
+
+    candidate_sets = generate_all_subsets(active, max_size=max_size, min_size=min_size)
+    forbidden_pairs = get_forbidden_pairs()
+    candidate_sets = filter_forbidden_pairs(candidate_sets, forbidden_pairs)
+    total_combos = len(candidate_sets)
+    excluded = raw_combos - total_combos
+    logger.info(
+        "After forbidden-pair filtering: %d valid combinations (%d excluded).",
+        total_combos, excluded,
     )
 
     if total_combos > _MAX_COMBINATIONS:
         raise RuntimeError(
-            f"\n[STOP] {total_combos:,} combinations exceeds the limit of "
+            f"\n[STOP] {total_combos:,} valid combinations exceeds the limit of "
             f"{_MAX_COMBINATIONS:,}.\n"
-            f"   Active features: {n}  |  Size range: {min_size}-{max_size}\n"
+            f"   Active features: {n}  |  Size range: {min_size}-{max_size}  |  "
+            f"Excluded by forbidden pairs: {excluded:,}\n"
             "   Resolution options:\n"
-            "     - Reduce max_size (e.g. max_size=3 gives "
-            f"{sum(comb(n, k) for k in range(min_size, min(3, n)+1)):,} combos)\n"
-            "     - Deactivate correlated or low-priority features in "
-            "configs/features.yaml\n"
+            "     - Reduce max_size\n"
+            "     - Deactivate features in configs/features.yaml\n"
+            "     - Add forbidden pairs in configs/model_selection.yaml\n"
             "     - Raise _MAX_COMBINATIONS if the large search space is intentional"
         )
 
-    candidate_sets = generate_all_subsets(active, max_size=max_size, min_size=min_size)
     print(
-        f"\n[OK] Step 2 -- {total_combos:,} feature combinations generated "
-        f"(sizes {min_size}-{max_size})."
+        f"\n[OK] Step 2 -- {total_combos:,} valid combinations generated "
+        f"(sizes {min_size}-{max_size}, {excluded:,} excluded by forbidden-pair rules)."
     )
 
     # ── Validate window sizes before committing to a long fit ─────────────────
@@ -287,11 +303,34 @@ def run_combinatorial_pipeline(
     if not metric_rows:
         raise RuntimeError("No models were successfully fitted — cannot build leaderboards.")
 
+    # Build a run tag from the config so every run saves distinct files.
+    run_tag = f"{len(active)}feat_size{min_size}-{max_size}"
+
+    # Persist all fitted-model results.
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    all_models_path = RESULTS_DIR / f"all_models_{run_tag}.parquet"
+    pd.DataFrame(metric_rows).to_parquet(all_models_path, index=False)
+    logger.info("All model results saved to %s", all_models_path)
+    print(f"\n[OK] Step 4 -- All model results saved to {all_models_path}")
+
     leaderboards = build_window_metric_leaderboards(metric_rows, top_n=top_n)
+
+    # Capture leaderboard text and save to a named file alongside the parquet.
+    buf = io.StringIO()
+    _old_stdout = sys.stdout
+    sys.stdout = buf
     print_leaderboards(leaderboards)
+    sys.stdout = _old_stdout
+    leaderboard_text = buf.getvalue()
+    print(leaderboard_text, end="")
+
+    leaderboards_path = RESULTS_DIR / f"leaderboards_{run_tag}.txt"
+    leaderboards_path.write_text(leaderboard_text, encoding="utf-8")
+    logger.info("Leaderboards saved to %s", leaderboards_path)
+
     print(
         f"[OK] Step 5 -- {len(windows)} windows x 4 metrics = "
-        f"{len(windows) * 4} leaderboards printed above. "
+        f"{len(windows) * 4} leaderboards printed above and saved to {leaderboards_path}. "
         "No model has been auto-selected."
     )
 

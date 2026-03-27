@@ -68,6 +68,41 @@ def get_curated_groups() -> list[list[str]]:
     return [group["features"] for group in ms_cfg.get("curated_groups", [])]
 
 
+def get_forbidden_pairs() -> list[tuple[str, str]]:
+    """Return forbidden feature pairs from configs/model_selection.yaml.
+
+    Returns:
+        List of (feature_a, feature_b) tuples that must not appear together
+        in the same model. Only pairs where both features are active matter.
+    """
+    _, ms_cfg = _load_configs()
+    raw = ms_cfg.get("forbidden_pairs", [])
+    return [(pair[0], pair[1]) for pair in raw]
+
+
+def filter_forbidden_pairs(
+    combos: list[list[str]],
+    forbidden_pairs: list[tuple[str, str]],
+) -> list[list[str]]:
+    """Remove combinations that contain any forbidden feature pair.
+
+    Args:
+        combos: List of feature combinations (each a sorted list of names).
+        forbidden_pairs: Pairs of features that must not appear together.
+
+    Returns:
+        Filtered list with all invalid combinations removed.
+    """
+    if not forbidden_pairs:
+        return combos
+    result = []
+    for combo in combos:
+        combo_set = set(combo)
+        if not any(a in combo_set and b in combo_set for a, b in forbidden_pairs):
+            result.append(combo)
+    return result
+
+
 def get_candidate_feature_sets() -> list[list[str]]:
     """Return all candidate feature sets according to the configured strategy.
 

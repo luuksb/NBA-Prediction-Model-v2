@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     import pandas as pd
 
-    from src.model import benchmark, evaluate, feature_sets, fit, select
+    from src.model import select
 
     args = parse_args()
     logger.info("=== Model Selection START ===")
@@ -50,30 +50,21 @@ def main() -> None:
     df = pd.read_parquet(args.dataset)
     logger.info("Loaded dataset: %d rows, %d cols", len(df), len(df.columns))
 
-    candidates = feature_sets.get_candidate_feature_sets()
-    logger.info("%d candidate feature sets generated.", len(candidates))
-
-    specs = fit.fit_all(df, candidates)
-    leaderboard = evaluate.build_leaderboard(specs, df)
-    logger.info("Leaderboard built. Top model: %s", leaderboard.iloc[0].to_dict())
-
-    prev = benchmark.load_previous_leaderboard()
-    comparison = benchmark.compare_leaderboards(leaderboard, prev)
-    logger.info("Benchmark comparison:\n%s", comparison.to_string())
-
-    benchmark.save_leaderboard(leaderboard)
+    leaderboards = select.run_combinatorial_pipeline(df)
 
     if args.select_top:
-        top_spec = select.select_top_model(leaderboard)
-        # Re-fit to get full spec with coefficients
-        # (leaderboard doesn't store coefficients — refit the top spec)
-        logger.info("Locking in top model: features=%s  window=%s",
-                    top_spec["features"], top_spec["window"])
+        # Flatten leaderboards to find the single best model across all windows/metrics
         import yaml
+        from src.model import fit
+
+        all_dfs = [lb for metrics in leaderboards.values() for lb in metrics.values()]
+        top_row = max(all_dfs, key=lambda d: d.iloc[0]["mcfadden_r2"]).iloc[0]
+        features = top_row["features"]
+        window_name = top_row["window"]
         with open(Path("configs/training_windows.yaml")) as f:
             windows_cfg = yaml.safe_load(f)
-        window = next(w for w in windows_cfg["windows"] if w["name"] == top_spec["window"])
-        full_spec = fit.fit_logit(df, top_spec["features"], window["name"],
+        window = next(w for w in windows_cfg["windows"] if w["name"] == window_name)
+        full_spec = fit.fit_logit(df, features, window["name"],
                                   window["start_year"], window["end_year"])
         path = select.save_chosen_model(full_spec)
         logger.info("Chosen model saved to %s", path)

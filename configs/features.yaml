@@ -43,7 +43,7 @@ features:
     description: Strength of schedule — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_srs
     description: Simple Rating System (MOV + SOS) — higher seed minus lower seed
@@ -55,7 +55,7 @@ features:
     description: True shooting percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_e_fg_percent
     description: Effective field goal percentage — higher seed minus lower seed
@@ -97,7 +97,7 @@ features:
     description: Three-point attempt rate — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_opp_e_fg_percent
     description: Opponent effective FG% (defensive) — higher seed minus lower seed
@@ -109,7 +109,7 @@ features:
     description: Opponent turnover percentage (forced) — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_opp_ft_fga
     description: Opponent free throw rate allowed — higher seed minus lower seed
@@ -236,19 +236,19 @@ features:
     description: Assists per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_stl_per_100_poss
     description: Steals per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_blk_per_100_poss
     description: Blocks per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_tov_per_100_poss
     description: Turnovers per 100 possessions — higher seed minus lower seed
@@ -413,13 +413,22 @@ features:
     active: false  # RAPTOR not available in raw data sources
 
   # ── Coach-level ──────────────────────────────────────────────────────────────
+  - name: delta_coach_series_wins_cum
+    description: >
+      Cumulative playoff series wins of head coach (before current year) —
+      higher seed minus lower seed. Zero when a coach has no prior playoff record,
+      so no rows are dropped during model fitting.
+    type: float
+    producing_step: steps/coach_experience
+    active: true
+
   - name: delta_coach_series_win_pct
     description: >
       Playoff series win percentage of head coach (before current year) —
       higher seed minus lower seed. NaN when either coach has no prior playoff record.
     type: float
     producing_step: steps/coach_experience
-    active: true
+    active: false
 
   # ── Pre-series player availability ────────────────────────────────────────────
   - name: top3_gp_pct_delta
@@ -431,7 +440,7 @@ features:
       (Already a delta; not renamed to delta_ to preserve step output name.)
     type: float
     producing_step: steps/player_availability
-    active: false
+    active: true
 
   # ── Injury-derived (Module 3 output — out-of-sample years only) ──────────────
   - name: delta_availability_pct
@@ -441,7 +450,7 @@ features:
       simulated values for 2025/2026.
     type: float
     producing_step: injury_module
-    active: true
+    active: false
 
 # ── Top-player ranking weights ─────────────────────────────────────────────────
 # Used by both Module 1 (feature construction) and Module 3 (injury sim)

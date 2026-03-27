@@ -1,5 +1,24 @@
 # Model selection parameters
 
+# Forbidden feature pairs — combinations containing both members are excluded.
+# Reasons: exact mathematical dependency, near-exact substitute, or >0.9 correlation.
+forbidden_pairs:
+  # n_rtg = o_rtg − d_rtg (exact linear dependency)
+  - [delta_n_rtg, delta_o_rtg]
+  - [delta_n_rtg, delta_d_rtg]
+  # mov ≈ n_rtg × pace/100 (~0.97 correlation; pace-scaled substitutes)
+  - [delta_mov, delta_n_rtg]
+  - [delta_mov, delta_o_rtg]
+  - [delta_mov, delta_d_rtg]
+  # trb = orb + drb (trb includes orb)
+  - [delta_trb_per_100_poss, delta_orb_per_100_poss]
+  # bpm_avail_sum and per_avail_sum both measure star-player quality (~0.9 correlation)
+  - [delta_bpm_avail_sum, delta_per_avail_sum]
+  # ts% is a superset of o_rtg's shooting component (~0.9 correlation)
+  - [delta_ts_percent, delta_o_rtg]
+  # opp_tov% is driven by steals; near-duplicate signal
+  - [delta_opp_tov_percent, delta_stl_per_100_poss]
+
 # Maximum number of features in a candidate feature set
 max_feature_set_size: 6
 
