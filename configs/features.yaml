@@ -457,4 +457,6 @@ features:
 top_player_ranking:
   n_players: 3
   weights:
-    bpm: 1.0  # sole ranking metric after RAPTOR removed
+    bpm: 1.0          # box-plus/minus (efficiency)
+    usg_percent: 1.0  # usage rate (offensive load)
+    mpg: 1.0          # minutes per game (role/trust) — computed as mp/g before ranking
