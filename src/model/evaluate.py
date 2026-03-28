@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from sklearn.calibration import calibration_curve
-from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
+from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from src.model.fit import ModelSpec, predict_proba
 
@@ -44,6 +44,27 @@ def mcfadden_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     base_rate = np.mean(y_true)
     ll_null = len(y_true) * (base_rate * np.log(base_rate) + (1 - base_rate) * np.log(1 - base_rate))
     return float(1.0 - ll_model / ll_null)
+
+
+def bic(y_true: np.ndarray, y_pred: np.ndarray, n_params: int) -> float:
+    """Compute Bayesian Information Criterion for a logit model.
+
+    BIC = -2 * log-likelihood + n_params * ln(n), where n_params includes
+    all coefficients plus the intercept (i.e. len(features) + 1).
+    Lower is better.
+
+    Args:
+        y_true: Binary ground-truth labels.
+        y_pred: Predicted probabilities in (0, 1).
+        n_params: Total number of estimated parameters (features + intercept).
+
+    Returns:
+        BIC value (lower is better).
+    """
+    eps = 1e-15
+    y_pred = np.clip(y_pred, eps, 1 - eps)
+    ll = float(np.sum(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)))
+    return float(-2 * ll + n_params * np.log(len(y_true)))
 
 
 def max_calibration_error(y_true: np.ndarray, y_pred: np.ndarray, n_bins: int = 10) -> float:
@@ -79,6 +100,7 @@ def evaluate_model(
     y_true = eval_df[TARGET_COL].astype(int).values
     y_pred = predict_proba(spec, eval_df)
 
+    n_params = len(spec["features"]) + 1  # coefficients + intercept
     return {
         "features": spec["features"],
         "window": spec["window"],
@@ -86,7 +108,7 @@ def evaluate_model(
         "mcfadden_r2": mcfadden_r2(y_true, y_pred),
         "brier_score": brier_score_loss(y_true, y_pred),
         "auc_roc": roc_auc_score(y_true, y_pred),
-        "log_loss": log_loss(y_true, y_pred),
+        "bic": bic(y_true, y_pred, n_params),
         "max_cal_error": max_calibration_error(y_true, y_pred),
     }
 
@@ -124,7 +146,7 @@ def build_leaderboard(
         weights["mcfadden_r2"] * leaderboard["mcfadden_r2"]
         - weights["brier_score"] * leaderboard["brier_score"]
         + weights["auc_roc"] * leaderboard["auc_roc"]
-        - weights["log_loss"] * leaderboard["log_loss"]
+        - weights.get("bic", 0.0) * leaderboard["bic"]
     )
 
     return leaderboard.sort_values("composite_score", ascending=False).reset_index(drop=True)
@@ -135,7 +157,7 @@ _METRIC_SORT_ASCENDING: dict[str, bool] = {
     "mcfadden_r2": False,
     "brier_score": True,
     "auc_roc": False,
-    "log_loss": True,
+    "bic": True,
 }
 
 

@@ -41,8 +41,8 @@ _MODEL_SELECTION_CONFIG = Path("configs/model_selection.yaml")
 _TARGET_COL = "higher_seed_wins"
 
 # Combination size range for the combinatorial search (per task spec).
-_COMBO_MIN_SIZE = 4
-_COMBO_MAX_SIZE = 5
+_COMBO_MIN_SIZE = 2
+_COMBO_MAX_SIZE = 4
 
 # Stop-condition thresholds.
 _MAX_COMBINATIONS = 50_000
@@ -53,7 +53,7 @@ _METRIC_LABELS: dict[str, str] = {
     "mcfadden_r2": "McFadden Pseudo R²",
     "brier_score":  "Brier Score       ",
     "auc_roc":      "AUC-ROC           ",
-    "log_loss":     "Log-Loss          ",
+    "bic":          "BIC               ",
 }
 
 

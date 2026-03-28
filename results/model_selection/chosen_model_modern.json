@@ -1,0 +1,15 @@
+{
+  "features": [
+    "delta_bpm_avail_sum",
+    "delta_playoff_series_wins",
+    "delta_ts_percent"
+  ],
+  "window": "modern",
+  "intercept": 0.9662644331320797,
+  "coefficients": {
+    "delta_bpm_avail_sum": 0.1386316124141055,
+    "delta_playoff_series_wins": 0.01633629159516694,
+    "delta_ts_percent": 19.17570691150139
+  },
+  "n_obs": 375
+}
