@@ -23,9 +23,9 @@ Three training windows: 1980–2024, 2000–2024, 2014–2024. Validation year: 
 
 ### Data Contracts
 - `data/final/series_dataset.parquet`: one row per historical playoff series. Columns: all candidate features + metadata (year, round, team_high, team_low, series_id, actual_winner)
-- `results/model_selection/chosen_model.json`: locked model spec (feature list, coefficients, training window)
+- `results/model_selection/chosen_model_{window}.json`: locked model spec per training window (feature list, coefficients, intercept, n_obs). Windows: `full`, `modern`, `recent`
 - `results/simulations/{year}_{window}/`: bracket simulation outputs
-- `results/injury_sims/`: injury availability distributions for out-of-sample years
+- `results/injury_sims/injury_sims_{year}.parquet`: injury availability distributions for out-of-sample years
 
 ## Data Sources (Priority Order)
 
@@ -33,44 +33,45 @@ Three training windows: 1980–2024, 2000–2024, 2014–2024. Validation year: 
 2. **`nba_api`** — for supplemental data not in Kaggle CSVs
 3. **Basketball Reference scraping** — try exactly once if needed. If it blocks (403, rate limit, CAPTCHA), **never attempt again**. Log the failure and move on.
 
-## Feature Registry (Initial — Will Be Extended)
+## Feature Registry
 
-All features defined in `configs/features.yaml`. Current initial set:
+All features defined in `configs/features.yaml`. Features are expressed as **deltas** (high seed minus low seed) in the model. Full registry is in config; highlights below.
 
-**Team-level:**
-- Offensive rating per 100 possessions
-- Defensive rating per 100 possessions
-- Net rating per 100 possessions (offensive rating minus defensive rating)
-- Effective field goal percentage
-- Three-point attempt rate
-- Pace (possessions per 48 minutes)
-- Total rebound rate
-- Offensive rebound rate
-- Turnover rate (per 100 possessions)
+**Team-level** (produced by `src/data/steps/team_ratings.py`):
+- Offensive / defensive / net rating per 100 possessions
+- Effective field goal %, true shooting %, three-point attempt rate
+- Pace, total rebound rate, offensive rebound rate, turnover rate
 - Roster average age (minutes-weighted)
-- Sum of total playoff series wins (historical, up to but not including current year)
-- Average playoff series wins per year
-- Sum of total playoff series played (historical, up to but not including current year)
-- Average playoff series played per year
+
+**Playoff experience** (produced by `src/data/steps/playoff_experience.py`):
+- Sum / average of historical playoff series wins and series played (up to but not including current year)
+
+**Player-level** (produced by `src/data/steps/player_ratings.py`):
+- Top-3 players per team by configurable composite rating (BPM, RAPTOR, PER, WS/48, usage)
+- Availability-weighted BPM sum (`bpm_avail_sum`) — **one of the three chosen model features**
+
+**Coach-level** (produced by `src/data/steps/coach_experience.py`):
+- Playoff series win percentage (up to but not including current year)
 
 **Matchup-level:**
 - Home-court advantage dummy
 
-**Player-level (top 3 per team by configurable ranking metric):**
-- BPM (Box Plus-Minus)
-- EPM (Estimated Plus-Minus)
-- RAPTOR
-- Usage rate
-- WS/48 (Win Shares per 48 minutes)
-- PER (Player Efficiency Rating)
+**Injury-derived** (Module 3 output, out-of-sample years only; produced by `src/data/steps/player_availability.py`):
+- Weighted team availability percentage (`availability_pct`) — series-level
 
-**Coach-level:**
-- Playoff series win percentage (up to but not including current year)
+When extending features: add to `configs/features.yaml` with name, type, description, producing step, and active flag. Then implement the producing step in `src/data/steps/`.
 
-**Injury-derived (Module 3 output, out-of-sample years only):**
-- Weighted team availability percentage (series-level)
+## Chosen Model (Locked)
 
-When extending features later: add to `configs/features.yaml` with name, type, description, producing step, and active flag. Then implement the producing step in `src/data/steps/`. 
+Three window variants locked in `results/model_selection/`:
+
+| Window | File | n_obs | Features |
+|--------|------|-------|---------|
+| full (1980–2024) | `chosen_model_full.json` | 659 | `delta_bpm_avail_sum`, `delta_playoff_series_wins`, `delta_ts_percent` |
+| modern (2000–2024) | `chosen_model_modern.json` | 375 | same |
+| recent (2014–2024) | `chosen_model_recent.json` | 165 | same |
+
+All three windows converged on the same 3-feature set. Model selection used BIC with combo sizes 2–4; forbidden pairs prevent collinear combinations (see `configs/model_selection.yaml`).
 
 ## Key Design Decisions
 
@@ -102,7 +103,12 @@ nba-playoff-model/
 ├── src/
 │   ├── data/
 │   │   ├── fetch.py
-│   │   ├── steps/             # Ordered preprocessing steps
+│   │   ├── steps/
+│   │   │   ├── team_ratings.py        # Team offensive/defensive/net ratings, pace, etc.
+│   │   │   ├── player_ratings.py      # Top-3 player composite ratings + availability weighting
+│   │   │   ├── player_availability.py # Historical games-played % per player per series
+│   │   │   ├── playoff_experience.py  # Cumulative series wins/played per team
+│   │   │   └── coach_experience.py    # Coach playoff series win %
 │   │   ├── assemble.py
 │   │   └── quality.py
 │   ├── model/
@@ -133,10 +139,17 @@ nba-playoff-model/
 └── notebooks/                 # Exploration only, never production code
 ```
 
+## Python Environment
+
+- **Python version:** 3.9.13
+- **Executable:** `C:/Users/luuks/AppData/Local/Programs/Python/Python39/python.exe`
+- Always use the full path above in bash commands (e.g. `C:/Users/luuks/AppData/Local/Programs/Python/Python39/python.exe scripts/run_data_pipeline.py`)
+- Do **not** rely on `python`, `python3`, or `py` aliases — they may not resolve correctly in the bash shell on this machine
+
 ## Coding Standards
 
 ### Style
-- Python 3.11+
+- Python 3.9+
 - Type hints on all function signatures
 - Docstrings on all public functions (Google style)
 - `ruff` for linting and formatting
