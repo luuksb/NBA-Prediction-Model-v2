@@ -1,12 +1,16 @@
 """player_ratings.py — Step: per-star player stats and availability-weighted sums.
 
-Identifies the top-N players per team (by BPM) for each playoff season,
-computes their regular-season stats (BPM, PER, usage rate), looks up their
-actual per-series availability from game logs, and produces availability-
-weighted composite features.
+Identifies the top-N players per team using a composite ranking (BPM, usage
+rate, minutes per game — equally weighted, z-score normalised) for each
+playoff season, computes their regular-season stats (BPM, PER, usage rate),
+looks up their actual per-series availability from game logs, and produces
+availability-weighted composite features.
+
+Ranking weights are read from configs/features.yaml (top_player_ranking section)
+and mirror the logic used in src/injury/identify_top_players.py.
 
 Data sources:
-  data/raw/Advanced.csv              — BPM, PER, usage per player per season
+  data/raw/Advanced.csv              — BPM, PER, usage, minutes per player per season
   data/raw/PlayerStatisticsMisc.csv  — game-level playoff appearances (1997+)
   data/raw/playoff_series/           — series metadata (series_id, games_played)
 
@@ -53,6 +57,51 @@ AVAIL_START_SEASON = 1997  # first season with game-level playoff data
 METRICS = ("bpm", "per", "usg")
 
 
+def _load_ranking_weights() -> dict[str, float]:
+    """Read top_player_ranking.weights from configs/features.yaml.
+
+    Returns:
+        Dict mapping metric name → weight. Falls back to BPM-only if config
+        is missing.
+    """
+    if FEATURES_YAML.exists():
+        with open(FEATURES_YAML, encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh)
+        return cfg.get("top_player_ranking", {}).get("weights", {"bpm": 1.0})
+    return {"bpm": 1.0}
+
+
+def _compute_composite_rating(
+    players_df: pd.DataFrame,
+    weights: dict[str, float],
+) -> pd.Series:
+    """Compute a weighted composite rating for each player row.
+
+    Each metric is z-score normalised across all rows before weighting so that
+    metrics on different scales (BPM, USG%, MPG) contribute equally when their
+    weights are equal. Mirrors compute_composite_rating() in
+    src/injury/identify_top_players.py.
+
+    Args:
+        players_df: DataFrame with columns for each metric in weights.
+        weights: Metric name → weight mapping (need not sum to 1).
+
+    Returns:
+        Series of composite ratings aligned to players_df index.
+    """
+    total_weight = sum(weights.values())
+    rating = pd.Series(0.0, index=players_df.index)
+    for metric, weight in weights.items():
+        if metric not in players_df.columns:
+            logger.warning("Ranking metric %r not in players DataFrame — skipping.", metric)
+            continue
+        col = pd.to_numeric(players_df[metric], errors="coerce").fillna(0.0)
+        std = col.std()
+        z = (col - col.mean()) / std if std > 0 else pd.Series(0.0, index=players_df.index)
+        rating += (weight / total_weight) * z
+    return rating
+
+
 def _normalise_name(name: str) -> str:
     """Lowercase, strip diacritics, replace spaces/punctuation with underscores.
 
@@ -77,7 +126,7 @@ def _load_n_stars() -> int:
 
 
 def _load_player_stats(seasons: list[int]) -> pd.DataFrame:
-    """Load BPM, PER, and usage rate from Advanced.csv for the given seasons.
+    """Load BPM, PER, usage rate, and minutes from Advanced.csv for the given seasons.
 
     For players traded mid-season (multiple team rows), keeps the row with
     the most games played to maximise sample reliability.
@@ -86,12 +135,15 @@ def _load_player_stats(seasons: list[int]) -> pd.DataFrame:
         seasons: Season end-years to include.
 
     Returns:
-        DataFrame with columns: season, team, player_norm, bpm, per, usg.
+        DataFrame with columns: season, team, player_norm, bpm, per, usg,
+        usg_percent, mpg.  ``usg`` and ``usg_percent`` hold the same value;
+        ``usg`` is used downstream for metric columns, ``usg_percent`` matches
+        the key name in the ranking-weights config.  ``mpg`` = mp / g.
         Rows with g < MIN_GAMES are excluded.
     """
     adv = pd.read_csv(
         ADVANCED_CSV,
-        usecols=["season", "lg", "player", "team", "g", "bpm", "per", "usg_percent"],
+        usecols=["season", "lg", "player", "team", "g", "mp", "bpm", "per", "usg_percent"],
     )
     adv = adv[
         (adv["lg"] == "NBA")
@@ -100,9 +152,11 @@ def _load_player_stats(seasons: list[int]) -> pd.DataFrame:
         & (adv["g"] >= MIN_GAMES)
     ].copy()
 
-    for col in ("bpm", "per", "usg_percent"):
+    for col in ("bpm", "per", "usg_percent", "mp"):
         adv[col] = pd.to_numeric(adv[col], errors="coerce")
-    adv.rename(columns={"usg_percent": "usg"}, inplace=True)
+
+    adv["usg"] = adv["usg_percent"]
+    adv["mpg"] = adv["mp"] / adv["g"].replace(0, np.nan)
     adv["player_norm"] = adv["player"].map(_normalise_name)
 
     # For multi-team players keep the row with the most games
@@ -112,11 +166,17 @@ def _load_player_stats(seasons: list[int]) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-    return adv[["season", "team", "player_norm", "bpm", "per", "usg"]]
+    return adv[["season", "team", "player_norm", "bpm", "per", "usg", "usg_percent", "mpg"]]
 
 
 def _identify_top_n(player_stats: pd.DataFrame, n: int) -> pd.DataFrame:
-    """Rank the top-N players per (season, team) by BPM.
+    """Rank the top-N players per (season, team) by composite rating.
+
+    The composite rating is a weighted average of z-score-normalised BPM,
+    usage rate, and MPG, with weights read from configs/features.yaml
+    (top_player_ranking.weights).  Z-scores are computed per season so that
+    each year's player pool is normalised independently, matching the
+    behaviour of src/injury/identify_top_players.py.
 
     Args:
         player_stats: From _load_player_stats().
@@ -124,16 +184,31 @@ def _identify_top_n(player_stats: pd.DataFrame, n: int) -> pd.DataFrame:
 
     Returns:
         DataFrame with columns: season, team, star_rank, player_norm, bpm, per, usg.
-        star_rank runs from 1 (best BPM) to N.
+        star_rank runs from 1 (highest composite rating) to N.
     """
+    weights = _load_ranking_weights()
+
+    # Z-score per season to match injury-module behaviour
+    rated_seasons: list[pd.DataFrame] = []
+    for _, season_df in player_stats.groupby("season"):
+        season_df = season_df.copy()
+        season_df["composite_rating"] = _compute_composite_rating(season_df, weights)
+        rated_seasons.append(season_df)
+
+    if not rated_seasons:
+        return pd.DataFrame(
+            columns=["season", "team", "star_rank", "player_norm", "bpm", "per", "usg"]
+        )
+
+    all_rated = pd.concat(rated_seasons, ignore_index=True)
 
     def _rank_group(grp: pd.DataFrame) -> pd.DataFrame:
-        top = grp.nlargest(n, "bpm").copy().reset_index(drop=True)
+        top = grp.nlargest(n, "composite_rating").copy().reset_index(drop=True)
         top["star_rank"] = range(1, len(top) + 1)
         return top
 
     result = (
-        player_stats.groupby(["season", "team"], group_keys=False)
+        all_rated.groupby(["season", "team"], group_keys=False)
         .apply(_rank_group)
         .reset_index(drop=True)
     )
@@ -246,7 +321,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     """Attach per-star player ratings and availability-weighted composite features.
 
     For each series row:
-      1. Identifies top-N players per team by regular-season BPM.
+      1. Identifies top-N players per team by composite rating (BPM, USG%, MPG).
       2. Records their BPM, PER, and usage rate as individual columns.
       3. Looks up their actual series-level availability from game logs
          (NaN for pre-1997 series).
