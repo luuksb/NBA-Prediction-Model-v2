@@ -294,6 +294,8 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         df["coach_series_win_pct_high"] = np.nan
         df["coach_series_win_pct_low"] = np.nan
+        df["coach_series_wins_cum_high"] = 0.0
+        df["coach_series_wins_cum_low"] = 0.0
         return df
 
     logger.info("Building coach record table up to season %d", max_season)
@@ -304,25 +306,37 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         df["coach_series_win_pct_high"] = np.nan
         df["coach_series_win_pct_low"] = np.nan
+        df["coach_series_wins_cum_high"] = 0.0
+        df["coach_series_wins_cum_low"] = 0.0
         return df
 
-    rec_idx = records.set_index(["season", "team_abbr"])["coach_series_win_pct"].to_dict()
+    rec_idx_pct = records.set_index(["season", "team_abbr"])["coach_series_win_pct"].to_dict()
+    rec_idx_cum = records.set_index(["season", "team_abbr"])["coach_series_wins_cum"].to_dict()
 
-    def _lookup(season: int, team: str) -> float | None:
-        return rec_idx.get((season, team), np.nan)
+    def _lookup_pct(season: int, team: str) -> float:
+        return rec_idx_pct.get((season, team), np.nan)
+
+    def _lookup_cum(season: int, team: str) -> float:
+        return float(rec_idx_cum.get((season, team), 0))
 
     df = df.copy()
     df["coach_series_win_pct_high"] = [
-        _lookup(row.season, row.team_high) for row in df.itertuples()
+        _lookup_pct(row.season, row.team_high) for row in df.itertuples()
     ]
     df["coach_series_win_pct_low"] = [
-        _lookup(row.season, row.team_low) for row in df.itertuples()
+        _lookup_pct(row.season, row.team_low) for row in df.itertuples()
+    ]
+    df["coach_series_wins_cum_high"] = [
+        _lookup_cum(row.season, row.team_high) for row in df.itertuples()
+    ]
+    df["coach_series_wins_cum_low"] = [
+        _lookup_cum(row.season, row.team_low) for row in df.itertuples()
     ]
 
     n_nan_high = df["coach_series_win_pct_high"].isna().sum()
     n_nan_low = df["coach_series_win_pct_low"].isna().sum()
     logger.info(
-        "coach_experience: added 2 features; NaN count — high: %d, low: %d",
+        "coach_experience: added 4 features; win_pct NaN count — high: %d, low: %d",
         n_nan_high,
         n_nan_low,
     )

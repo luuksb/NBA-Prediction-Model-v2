@@ -49,7 +49,7 @@ features:
     description: Simple Rating System (MOV + SOS) — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_ts_percent
     description: True shooting percentage — higher seed minus lower seed
@@ -61,25 +61,25 @@ features:
     description: Effective field goal percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_tov_percent
     description: Turnover percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_orb_percent
     description: Offensive rebound percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_drb_percent
     description: Defensive rebound percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_ft_fga
     description: Free throw rate (FT/FGA) — higher seed minus lower seed
@@ -91,7 +91,7 @@ features:
     description: Free throw attempt rate — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x3p_ar
     description: Three-point attempt rate — higher seed minus lower seed
@@ -115,7 +115,7 @@ features:
     description: Opponent free throw rate allowed — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_age
     description: Average team age — higher seed minus lower seed
@@ -127,92 +127,92 @@ features:
     description: Regular season wins — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_l
     description: Regular season losses — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   # ── Team-level: Team Stats Per 100 Possessions ───────────────────────────────
   - name: delta_pts_per_100_poss
     description: Points scored per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_fg_per_100_poss
     description: Field goals made per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_fga_per_100_poss
     description: Field goal attempts per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_fg_percent
     description: Field goal percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x3p_per_100_poss
     description: Three-pointers made per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x3pa_per_100_poss
     description: Three-point attempts per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x3p_percent
     description: Three-point percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x2p_per_100_poss
     description: Two-pointers made per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x2pa_per_100_poss
     description: Two-point attempts per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_x2p_percent
     description: Two-point percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_ft_per_100_poss
     description: Free throws made per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_fta_per_100_poss
     description: Free throw attempts per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_ft_percent
     description: Free throw percentage — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_orb_per_100_poss
     description: Offensive rebounds per 100 possessions — higher seed minus lower seed
@@ -224,7 +224,7 @@ features:
     description: Defensive rebounds per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_trb_per_100_poss
     description: Total rebounds per 100 possessions — higher seed minus lower seed
@@ -277,7 +277,7 @@ features:
       higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
-    active: true
+    active: false
 
   - name: delta_playoff_series_played
     description: >
@@ -285,7 +285,7 @@ features:
       higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
-    active: true
+    active: false
 
   - name: delta_avg_playoff_series_played
     description: >
@@ -293,7 +293,7 @@ features:
       higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
-    active: true
+    active: false
 
   # ── Player-level: individual star stats (top-3 per team, ranked by BPM) ──────
   # Stars are ranked 1 (highest BPM) to 3 within each team for each season.
@@ -306,55 +306,55 @@ features:
     description: Availability-weighted BPM for star #1 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star2_bpm
     description: Availability-weighted BPM for star #2 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star3_bpm
     description: Availability-weighted BPM for star #3 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star1_per
     description: Availability-weighted PER for star #1 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star2_per
     description: Availability-weighted PER for star #2 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star3_per
     description: Availability-weighted PER for star #3 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star1_usg
     description: Availability-weighted usage rate for star #1 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star2_usg
     description: Availability-weighted usage rate for star #2 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star3_usg
     description: Availability-weighted usage rate for star #3 — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   # ── Player-level: per-series availability ─────────────────────────────────────
   # NaN for series before 1997 (no game-level data available).
@@ -363,19 +363,19 @@ features:
     description: Series games-played fraction for star #1 — higher seed minus lower seed. NaN pre-1997.
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star2_avail
     description: Series games-played fraction for star #2 — higher seed minus lower seed. NaN pre-1997.
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   - name: delta_star3_avail
     description: Series games-played fraction for star #3 — higher seed minus lower seed. NaN pre-1997.
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   # ── Player-level: availability-weighted sums ─────────────────────────────────
 
@@ -397,7 +397,7 @@ features:
     description: Availability-weighted usage sum — higher seed minus lower seed
     type: float
     producing_step: steps/player_ratings
-    active: true
+    active: false
 
   # ── EPM / RAPTOR — inactive (data not available) ─────────────────────────────
   - name: delta_epm_top3_mean
@@ -413,13 +413,22 @@ features:
     active: false  # RAPTOR not available in raw data sources
 
   # ── Coach-level ──────────────────────────────────────────────────────────────
+  - name: delta_coach_series_wins_cum
+    description: >
+      Cumulative playoff series wins of head coach (before current year) —
+      higher seed minus lower seed. Zero when a coach has no prior playoff record,
+      so no rows are dropped during model fitting.
+    type: float
+    producing_step: steps/coach_experience
+    active: true
+
   - name: delta_coach_series_win_pct
     description: >
       Playoff series win percentage of head coach (before current year) —
       higher seed minus lower seed. NaN when either coach has no prior playoff record.
     type: float
     producing_step: steps/coach_experience
-    active: true
+    active: false
 
   # ── Pre-series player availability ────────────────────────────────────────────
   - name: top3_gp_pct_delta
@@ -441,7 +450,7 @@ features:
       simulated values for 2025/2026.
     type: float
     producing_step: injury_module
-    active: true
+    active: false
 
 # ── Top-player ranking weights ─────────────────────────────────────────────────
 # Used by both Module 1 (feature construction) and Module 3 (injury sim)

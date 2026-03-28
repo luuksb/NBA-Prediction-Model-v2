@@ -18,7 +18,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 WINDOWS_CONFIG = Path("configs/training_windows.yaml")
-TARGET_COL = "high_seed_wins"  # 1 if higher seed won the series, 0 otherwise
+TARGET_COL = "higher_seed_wins"  # 1 if higher seed won the series, 0 otherwise
 
 
 class ModelSpec(TypedDict):

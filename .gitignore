@@ -31,6 +31,7 @@ results/injury_sims/*
 !results/model_selection/.gitkeep
 !results/simulations/.gitkeep
 !results/injury_sims/.gitkeep
+!results/model_selection/chosen_model_*.json
 
 # Notebooks checkpoints
 .ipynb_checkpoints/
