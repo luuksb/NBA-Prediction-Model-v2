@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from src.simulation.bracket import Bracket, Series, advance_bracket, build_bracket
-from src.simulation.simulate_series import simulate_series
+from src.simulation.simulate_series import load_spec, simulate_series
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ def run_simulations(
     east_seeds: list[str],
     west_seeds: list[str],
     team_features: pd.DataFrame,
+    window: str = "full",
     n_sims: int = N_SIMULATIONS,
     injury_draws: dict[str, np.ndarray] | None = None,
     seed: int | None = None,
@@ -32,6 +33,7 @@ def run_simulations(
         east_seeds: 8 Eastern Conference team IDs, ordered 1st to 8th.
         west_seeds: 8 Western Conference team IDs, ordered 1st to 8th.
         team_features: DataFrame indexed by team ID with feature columns.
+        window: Training window name ('full', 'modern', 'recent').
         n_sims: Number of Monte Carlo iterations.
         injury_draws: Optional dict from team_id → availability array (length >= n_sims).
         seed: Optional random seed for reproducibility.
@@ -40,11 +42,34 @@ def run_simulations(
         List of dicts, one per simulation, with keys:
         iteration, champion, finalist_east, finalist_west, round_exits (dict).
     """
+    spec = load_spec(window)
     rng = np.random.default_rng(seed)
     outcomes: list[dict] = []
 
+    # Home-court advantage applies in all normal playoff years; 2020 was a
+    # neutral-site bubble. This delta is constant within a given simulated year.
+    _NEUTRAL_SITE_YEARS: frozenset[int] = frozenset({2020})
+    series_deltas: dict[str, float] = {
+        "delta_home_court_advantage": 0.0 if year in _NEUTRAL_SITE_YEARS else 1.0,
+    }
+
+    # Extract regular-season wins for cross-conference tiebreaking in Finals.
+    # Both conference champions have within-conference seed rank 1; the NBA
+    # awards home-court to the team with more regular-season wins.
+    # Falls back to n_rtg (×1000) if w is unavailable (rebuild team_season_features
+    # with delta_w active to get the exact win count).
+    all_teams = list(east_seeds) + list(west_seeds)
+    team_wins: dict[str, int] = {}
+    tiebreak_col = next((c for c in ("w", "n_rtg") if c in team_features.columns), None)
+    if tiebreak_col is not None:
+        scale = 1 if tiebreak_col == "w" else 1000
+        for team in all_teams:
+            if team in team_features.index:
+                val = team_features.loc[team, tiebreak_col]
+                team_wins[team] = int(round(float(val) * scale))
+
     for i in range(n_sims):
-        bracket = build_bracket(year, list(east_seeds), list(west_seeds))
+        bracket = build_bracket(year, list(east_seeds), list(west_seeds), team_wins=team_wins)
         round_exits: dict[str, int] = {}
 
         while True:
@@ -55,8 +80,10 @@ def run_simulations(
                     series.low_seed,
                     team_features,
                     rng,
+                    spec=spec,
                     injury_draws=injury_draws,
                     draw_index=i,
+                    series_deltas=series_deltas,
                 )
                 series.winner = winner
                 loser = series.low_seed if winner == series.high_seed else series.high_seed

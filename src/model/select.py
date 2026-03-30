@@ -41,11 +41,11 @@ _MODEL_SELECTION_CONFIG = Path("configs/model_selection.yaml")
 _TARGET_COL = "higher_seed_wins"
 
 # Combination size range for the combinatorial search (per task spec).
-_COMBO_MIN_SIZE = 2
-_COMBO_MAX_SIZE = 4
+_COMBO_MIN_SIZE = 5
+_COMBO_MAX_SIZE = 5
 
 # Stop-condition thresholds.
-_MAX_COMBINATIONS = 50_000
+_MAX_COMBINATIONS = 80_000
 _MIN_WINDOW_SERIES = 30
 _MAX_CONVERGENCE_FAILURE_RATE = 0.20
 

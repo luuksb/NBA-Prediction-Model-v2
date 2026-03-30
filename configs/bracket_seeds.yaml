@@ -1,0 +1,24 @@
+# Bracket seeding configuration
+# For each year listed here, seeds take precedence over the playoff_series CSV.
+# Historical years (1980–2024) are loaded automatically from data/raw/playoff_series/.
+# Add out-of-sample years here manually once seedings are known.
+#
+# Format:
+#   bracket_seeds:
+#     <year>:
+#       east: [seed1, seed2, seed3, seed4, seed5, seed6, seed7, seed8]
+#       west: [seed1, seed2, seed3, seed4, seed5, seed6, seed7, seed8]
+#
+# Team abbreviations must match those in data/raw/*.csv (e.g. BOS, NYK, MIL).
+
+bracket_seeds:
+  2025:
+    # East: CLE 1, BOS 2, NYK 3, IND 4, MIL 5, DET 6, ORL 7, MIA 8
+    east: [CLE, BOS, NYK, IND, MIL, DET, ORL, MIA]
+    # West: OKC 1, HOU 2, LAL 3, DEN 4, LAC 5, MIN 6, GSW 7, MEM 8
+    west: [OKC, HOU, LAL, DEN, LAC, MIN, GSW, MEM]
+
+  # 2026 seedings — fill in once playoff bracket is set
+  # 2026:
+  #   east: [BOS, CLE, NYK, MIL, ORL, IND, MIA, CHI]
+  #   west: [OKC, HOU, MIN, LAL, GSW, DEN, SAC, MEM]

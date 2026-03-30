@@ -50,10 +50,12 @@ RAW_DIR = Path("data/raw")
 ADVANCED_CSV = RAW_DIR / "Advanced.csv"
 PLAYER_STATS_MISC_CSV = RAW_DIR / "PlayerStatisticsMisc.csv"
 PLAYOFF_SERIES_DIR = RAW_DIR / "playoff_series"
+EPM_PARQUET = RAW_DIR / "epm.parquet"
 FEATURES_YAML = Path("configs/features.yaml")
 
 MIN_GAMES = 10          # minimum regular-season games to be eligible as a star
 AVAIL_START_SEASON = 1997  # first season with game-level playoff data
+EPM_START_SEASON = 2002   # first season with EPM data
 METRICS = ("bpm", "per", "usg")
 
 
@@ -107,13 +109,18 @@ def _normalise_name(name: str) -> str:
 
     Diacritic stripping ensures names like 'Kukoč' (Advanced.csv) and 'Kukoc'
     (nba_api) normalise to the same key.
+
+    Generational suffixes (Jr., Sr., II, III, IV, V) are stripped so that
+    PlayerStatisticsMisc entries like 'Jimmy Butler III' match the Advanced.csv
+    entry 'Jimmy Butler'.
     """
     ascii_name = (
         unicodedata.normalize("NFKD", str(name))
         .encode("ascii", errors="ignore")
         .decode("ascii")
     )
-    return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
+    normalised = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
+    return re.sub(r"_(?:jr|sr|ii|iii|iv|v)$", "", normalised)
 
 
 def _load_n_stars() -> int:
@@ -167,6 +174,70 @@ def _load_player_stats(seasons: list[int]) -> pd.DataFrame:
     )
 
     return adv[["season", "team", "player_norm", "bpm", "per", "usg", "usg_percent", "mpg"]]
+
+
+def _load_epm_set(seasons: list[int]) -> set[tuple[int, str]]:
+    """Return the set of (season, player_norm) pairs present in the EPM top-5 data.
+
+    The scraped EPM file contains only the top-5 visible players per season
+    (paywall limits the rest). Membership in this set is used as a binary
+    superstar indicator: a team whose best player appears here has a genuine
+    top-5 EPM player.
+
+    EPM data is available from 2002 onward. Seasons outside that range yield
+    no entries, so the indicator will be 0 for all pre-2002 series.
+
+    Args:
+        seasons: Season end-years to include.
+
+    Returns:
+        Set of (season, player_norm) tuples for players present in EPM data.
+    """
+    if not EPM_PARQUET.exists():
+        logger.warning("EPM parquet not found at %s — star_epm_avail will be 0.", EPM_PARQUET)
+        return set()
+
+    epm_seasons = [s for s in seasons if s >= EPM_START_SEASON]
+    if not epm_seasons:
+        return set()
+
+    epm = pd.read_parquet(EPM_PARQUET, columns=["season", "player_name"])
+    epm = epm[
+        (epm["season"].isin(epm_seasons)) & (epm["player_name"] != "Locked Player")
+    ].copy()
+    epm["player_norm"] = epm["player_name"].map(_normalise_name)
+
+    return {(int(row.season), row.player_norm) for row in epm.itertuples()}
+
+
+def _load_bpm_top5_set(
+    player_stats: pd.DataFrame,
+    seasons: list[int],
+    n_top: int = 5,
+) -> set[tuple[int, str]]:
+    """Return the set of (season, player_norm) for the top-N players by BPM.
+
+    Used to backfill the superstar indicator for seasons before EPM_START_SEASON.
+    Mirrors the EPM top-5 concept: a player in this set is considered a genuine
+    league-best talent for that year.
+
+    Args:
+        player_stats: From _load_player_stats() — must contain season, player_norm, bpm.
+        seasons: Seasons to include (typically those before EPM_START_SEASON).
+        n_top: Number of top players per season to flag (default 5).
+
+    Returns:
+        Set of (season, player_norm) tuples for BPM top-N players.
+    """
+    subset = player_stats[player_stats["season"].isin(seasons)].copy()
+    subset["bpm"] = pd.to_numeric(subset["bpm"], errors="coerce")
+
+    result: set[tuple[int, str]] = set()
+    for season, grp in subset.groupby("season"):
+        top = grp.nlargest(n_top, "bpm")
+        for row in top.itertuples():
+            result.add((int(season), row.player_norm))
+    return result
 
 
 def _identify_top_n(player_stats: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -354,17 +425,33 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     top_n_idx = top_n.set_index(["season", "team", "star_rank"])
 
     avail_lookup = _build_series_availability(df)
+
+    # Superstar set: EPM top-5 for 2002+, BPM top-5 for earlier seasons.
+    pre_epm_seasons = [s for s in seasons if s < EPM_START_SEASON]
+    epm_set = _load_epm_set(seasons)
+    bpm_set = _load_bpm_top5_set(player_stats, pre_epm_seasons)
+    superstar_set = epm_set | bpm_set
+    logger.info(
+        "player_ratings: superstar set — %d EPM entries (2002+), %d BPM entries (pre-2002), "
+        "%d total",
+        len(epm_set), len(bpm_set), len(superstar_set),
+    )
     logger.info(
         "player_ratings: availability entries loaded: %d (series, player) pairs",
         len(avail_lookup),
     )
+
+    # Series that have at least one avail entry — any star absent from these
+    # played 0 games and should get avail=0.0, not NaN (which would be
+    # misread as "unknown / pre-1997" and filled to 1.0 downstream).
+    series_with_avail: set[str] = {sid for sid, _ in avail_lookup}
 
     df = df.copy()
 
     for side, team_col in (("high", "team_high"), ("low", "team_low")):
         # Accumulate values for all ranks in one pass over df rows
         rank_cols: dict[int, dict[str, list]] = {
-            r: {"bpm": [], "per": [], "usg": [], "avail": []}
+            r: {"bpm": [], "per": [], "usg": [], "avail": [], "player_norm": []}
             for r in range(1, n + 1)
         }
 
@@ -384,12 +471,19 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
                     bpm = per = usg = np.nan
                     player_norm = ""
 
-                avail = avail_lookup.get((series_id, player_norm), np.nan)
+                # For series with avail data, a missing entry means 0 games
+                # played (injured/DNP). For pre-1997 series (no game logs),
+                # NaN signals "unknown" and is later treated as full avail.
+                if series_id in series_with_avail:
+                    avail = avail_lookup.get((series_id, player_norm), 0.0)
+                else:
+                    avail = avail_lookup.get((series_id, player_norm), np.nan)
 
                 rank_cols[r]["bpm"].append(bpm)
                 rank_cols[r]["per"].append(per)
                 rank_cols[r]["usg"].append(usg)
                 rank_cols[r]["avail"].append(avail)
+                rank_cols[r]["player_norm"].append(player_norm)
 
         for r in range(1, n + 1):
             # Raw availability (0–1 or NaN for pre-1997); stored for reference
@@ -412,6 +506,36 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
             df[f"{metric}_avail_sum_{side}"] = sum(
                 df[f"star{r}_{metric}_{side}"] for r in range(1, n + 1)
             )
+
+        # BPM-weighted availability: fraction of raw BPM quality that is available.
+        # = bpm_avail_sum / sum(raw_bpm_r)  →  1.0 when all stars play fully.
+        # Pre-1997: avail assumed 1.0, so this equals 1.0 for all teams.
+        raw_bpm_sum = sum(
+            pd.Series(rank_cols[r]["bpm"], index=df.index).fillna(0.0)
+            for r in range(1, n + 1)
+        )
+        df[f"bpm_weighted_avail_{side}"] = (
+            df[f"bpm_avail_sum_{side}"] / raw_bpm_sum.where(raw_bpm_sum > 0)
+        ).fillna(0.0)
+
+        # Top star's BPM × availability: isolates the best player's contribution.
+        df[f"star_bpm_avail_{side}"] = df[f"star1_bpm_{side}"]
+
+        # star_flag: 1 × avail if any top-N star is an EPM/BPM superstar, else 0.
+        # Scans stars by rank order; uses the first match's availability.
+        # For pre-2002 seasons (no EPM data) this will always be 0.
+        flag_vals: list[float] = []
+        for i in range(len(df)):
+            val = 0.0
+            for r in range(1, n + 1):
+                pnorm = rank_cols[r]["player_norm"][i]
+                season_i = df["season"].iat[i]
+                if (season_i, pnorm) in superstar_set:
+                    avail_raw = rank_cols[r]["avail"][i]
+                    val = 1.0 * (1.0 if pd.isna(avail_raw) else float(avail_raw))
+                    break
+            flag_vals.append(val)
+        df[f"star_flag_{side}"] = flag_vals
 
     for side in ("high", "low"):
         n_nan = df[f"star1_avail_{side}"].isna().sum()

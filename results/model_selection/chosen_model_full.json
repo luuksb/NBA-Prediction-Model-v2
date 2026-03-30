@@ -5,11 +5,11 @@
     "delta_ts_percent"
   ],
   "window": "full",
-  "intercept": 1.1476349845269,
+  "intercept": 1.148215003704729,
   "coefficients": {
-    "delta_bpm_avail_sum": 0.08634728788546522,
-    "delta_playoff_series_wins": 0.019166138740399203,
-    "delta_ts_percent": 15.021926827222675
+    "delta_bpm_avail_sum": 0.07386025832191853,
+    "delta_playoff_series_wins": 0.0071119237582352056,
+    "delta_ts_percent": 12.266175864091624
   },
   "n_obs": 659
 }
