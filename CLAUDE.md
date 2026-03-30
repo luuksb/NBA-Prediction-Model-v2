@@ -48,7 +48,8 @@ All features defined in `configs/features.yaml`. Features are expressed as **del
 
 **Player-level** (produced by `src/data/steps/player_ratings.py`):
 - Top-3 players per team by configurable composite rating (BPM, RAPTOR, PER, WS/48, usage)
-- Availability-weighted BPM sum (`bpm_avail_sum`) — **one of the three chosen model features**
+- Availability-weighted BPM sum (`bpm_avail_sum`) — **one of the four chosen model features**
+- Star flag (`star_flag`) — binary indicator for presence of a top-tier star player — **one of the four chosen model features**
 
 **Coach-level** (produced by `src/data/steps/coach_experience.py`):
 - Playoff series win percentage (up to but not including current year)
@@ -71,7 +72,7 @@ Three window variants locked in `results/model_selection/`:
 | modern (2000–2024) | `chosen_model_modern.json` | 375 | same |
 | recent (2014–2024) | `chosen_model_recent.json` | 165 | same |
 
-All three windows converged on the same 3-feature set. Model selection used BIC with combo sizes 2–4; forbidden pairs prevent collinear combinations (see `configs/model_selection.yaml`).
+All three windows converged on the same 3-feature set. `delta_star_flag` was removed — insignificant in all windows (p=0.24/0.18/0.32) and dropping it improved BIC by ~4–5 points per window. Model selection used BIC with combo sizes 2–5; forbidden pairs prevent collinear combinations (see `configs/model_selection.yaml`).
 
 ## Key Design Decisions
 

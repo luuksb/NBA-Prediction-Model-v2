@@ -119,6 +119,29 @@ def _check_missingness(df: pd.DataFrame, stat_cols: list[str], label: str) -> No
             )
 
 
+def build_team_stats(seasons: list[int]) -> pd.DataFrame:
+    """Return merged per-team regular-season stats for the given seasons.
+
+    Combines Team Stats Per 100 Poss.csv and Team Summaries.csv without
+    computing deltas. Used by the assembly step to build team_season_features.parquet.
+
+    Args:
+        seasons: Season end-years to include.
+
+    Returns:
+        DataFrame with columns: season, team, <all numeric stat columns>.
+    """
+    per100 = _load_per100_stats(seasons)
+    summaries = _load_summary_stats(seasons)
+    team_stats = per100.merge(
+        summaries,
+        on=["season", "abbreviation"],
+        how="outer",
+        suffixes=("", "_summ"),
+    )
+    return team_stats.rename(columns={"abbreviation": "team"})
+
+
 def run(df: pd.DataFrame) -> pd.DataFrame:
     """Attach delta team stat features to a series-level DataFrame.
 
