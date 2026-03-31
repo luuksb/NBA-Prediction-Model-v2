@@ -44,6 +44,43 @@ cfg = load_dashboard_config()
 COLORS = cfg["ui"]["colors"]
 
 # ---------------------------------------------------------------------------
+# NBA team colors  (primary, secondary, tertiary)
+# Source: official NBA brand guidelines; equivalent to nbacolors.com values.
+# ---------------------------------------------------------------------------
+_TEAM_COLORS: dict[str, tuple[str, str, str]] = {
+    "ATL": ("#E03A3E", "#C1D32F", "#26282A"),  # Hawks
+    "BOS": ("#007A33", "#BA9653", "#000000"),  # Celtics
+    "BKN": ("#000000", "#FFFFFF", "#AAAAAA"),  # Nets
+    "CHA": ("#1D1160", "#00788C", "#A1A1A4"),  # Hornets
+    "CHI": ("#CE1141", "#000000", "#FFFFFF"),  # Bulls
+    "CLE": ("#860038", "#FDBB30", "#002D62"),  # Cavaliers
+    "DAL": ("#00538C", "#002B5E", "#B8C4CA"),  # Mavericks
+    "DEN": ("#0E2240", "#FEC524", "#8B2131"),  # Nuggets
+    "DET": ("#C8102E", "#1D428A", "#BEC0C2"),  # Pistons
+    "GSW": ("#1D428A", "#FFC72C", "#FFFFFF"),  # Warriors
+    "HOU": ("#CE1141", "#000000", "#C4CED4"),  # Rockets
+    "IND": ("#002D62", "#FDBB30", "#BEC0C2"),  # Pacers
+    "LAC": ("#C8102E", "#1D428A", "#BEC0C2"),  # Clippers
+    "LAL": ("#552583", "#FDB927", "#000000"),  # Lakers
+    "MEM": ("#5D76A9", "#12173F", "#F5B112"),  # Grizzlies
+    "MIA": ("#98002E", "#F9A01B", "#000000"),  # Heat
+    "MIL": ("#00471B", "#EEE1C6", "#000000"),  # Bucks
+    "MIN": ("#0C2340", "#236192", "#78BE20"),  # Timberwolves
+    "NOP": ("#0C2340", "#C8102E", "#85714D"),  # Pelicans
+    "NYK": ("#006BB6", "#F58426", "#BEC0C2"),  # Knicks
+    "OKC": ("#007AC1", "#EF3B24", "#002D62"),  # Thunder
+    "ORL": ("#0077C0", "#C4CED4", "#000000"),  # Magic
+    "PHI": ("#006BB6", "#ED174C", "#002B5C"),  # 76ers
+    "PHX": ("#1D1160", "#E56020", "#F9AD1B"),  # Suns
+    "POR": ("#E03A3E", "#000000", "#FFFFFF"),  # Trail Blazers
+    "SAC": ("#5A2D81", "#63727A", "#000000"),  # Kings
+    "SAS": ("#C4CED4", "#000000", "#FFFFFF"),  # Spurs
+    "TOR": ("#CE1141", "#000000", "#A1A1A4"),  # Raptors
+    "UTA": ("#002B5C", "#00471B", "#F9A01B"),  # Jazz
+    "WAS": ("#002B5C", "#E31837", "#C4CED4"),  # Wizards
+}
+
+# ---------------------------------------------------------------------------
 # Global CSS
 # ---------------------------------------------------------------------------
 _GLOBAL_CSS = f"""
@@ -69,9 +106,11 @@ _GLOBAL_CSS = f"""
     width: 100%;
     height: 620px;
     gap: 0;
-    padding: 8px 0 16px 0;
+    padding: 12px 8px 16px 8px;
     overflow-x: auto;
     box-sizing: border-box;
+    background: {COLORS['background']};
+    border-radius: 8px;
   }}
 
   /* ── Conference blocks ───────────────────────────────────────────────── */
@@ -110,6 +149,14 @@ _GLOBAL_CSS = f"""
     padding: 0 3px;
     box-sizing: border-box;
   }}
+  /* West: R1 (1st) outward; R2 (2nd) toward center; CF (3rd) away from center */
+  .conf-block.west .conf-rounds > .round-col:nth-child(1) {{ padding-right: 18px; }}
+  .conf-block.west .conf-rounds > .round-col:nth-child(2) {{ padding-left: 14px; }}
+  .conf-block.west .conf-rounds > .round-col:nth-child(3) {{ padding-right: 14px; }}
+  /* East: CF (1st) away from center; R2 (2nd) toward center; R1 (3rd) outward */
+  .conf-block.east .conf-rounds > .round-col:nth-child(1) {{ padding-left: 14px; }}
+  .conf-block.east .conf-rounds > .round-col:nth-child(2) {{ padding-right: 14px; }}
+  .conf-block.east .conf-rounds > .round-col:nth-child(3) {{ padding-left: 18px; }}
   .round-col-header {{
     flex-shrink: 0;
   }}
@@ -119,6 +166,16 @@ _GLOBAL_CSS = f"""
     flex-direction: column;
     justify-content: space-around;
     align-items: stretch;
+    min-height: 0;
+    position: relative;
+  }}
+  /* Matchup pair wrapper: distributes the two matchups inside it */
+  .matchup-pair {{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    position: relative;
     min-height: 0;
   }}
   .round-label {{
@@ -184,136 +241,190 @@ _GLOBAL_CSS = f"""
     position: relative;
   }}
 
-  /* ── Team node card ──────────────────────────────────────────────────── */
+  /* ── Team node card (2K26 pill style) ───────────────────────────────── */
   .team-node {{
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    gap: 0;
-    background: #0f2035;
-    border: 1px solid #1e3a5a;
-    border-radius: 3px;
-    padding: 0;
-    min-height: 38px;
+    background: #0d1520;
+    border: 1px solid #1e2d3d;
+    border-radius: 4px;
+    min-height: 36px;
     position: relative;
     box-sizing: border-box;
     width: 100%;
     overflow: hidden;
   }}
-  .team-node:hover {{ border-color: {COLORS['accent']}; }}
+  .team-node:hover {{ border-color: #4a7aaa; }}
   .team-node.champion {{
     border-color: {COLORS['champion_border']};
-    box-shadow: 0 0 10px 2px rgba(255,215,0,0.35);
-    background: #0d1e30;
+    box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+  }}
+
+  /* ── Colored pill (left section, primary team color) ─────────────────── */
+  .team-pill {{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
   }}
 
   /* ── Seed badge ──────────────────────────────────────────────────────── */
   .team-seed-badge {{
-    width: 22px;
-    min-width: 22px;
+    width: 18px;
+    min-width: 18px;
+    align-self: stretch;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 9px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.28);
+    flex-shrink: 0;
+  }}
+
+  /* ── Team abbreviation ───────────────────────────────────────────────── */
+  .team-abbrev {{
     font-size: 10px;
     font-weight: 800;
-    color: #ffffff;
-    flex-shrink: 0;
-  }}
-
-  /* ── Logo ────────────────────────────────────────────────────────────── */
-  .team-logo {{
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-    flex-shrink: 0;
-    align-self: center;
-    margin: 0 4px;
-  }}
-  .team-logo-fallback {{
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8px;
-    font-weight: 700;
-    color: #607d8b;
-    flex-shrink: 0;
-    align-self: center;
-    margin: 0 4px;
-    border: 1px solid #1a3a5c;
-    border-radius: 2px;
-    background: #0a1929;
-  }}
-
-  /* ── Team text ───────────────────────────────────────────────────────── */
-  .team-info {{
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    justify-content: center;
-  }}
-  .team-abbrev {{
-    font-size: 11px;
-    font-weight: 700;
     color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 4px 0 5px;
   }}
+
+  /* ── Logo area (right of pill) ───────────────────────────────────────── */
+  .team-logo-area {{
+    width: 30px;
+    min-width: 30px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }}
+  .team-logo {{
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+  }}
+  .team-logo-fallback {{
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    font-weight: 700;
+    color: #8a9ab0;
+  }}
+
+  /* ── Win probability ─────────────────────────────────────────────────── */
   .team-prob {{
     font-size: 10px;
     font-weight: 700;
-    color: {COLORS['accent']};
+    color: #8aadcc;
     white-space: nowrap;
     flex-shrink: 0;
     align-self: center;
-    padding-right: 6px;
+    padding: 0 5px;
+    min-width: 28px;
+    text-align: right;
   }}
   .team-node.champion .team-prob {{ color: {COLORS['champion_border']}; }}
 
-  /* ── Bracket connector lines ─────────────────────────────────────────── */
-  /* Horizontal stub from each team card pointing inward */
-  .conf-block.west .round-col-body .team-node::after {{
-    content: '';
-    position: absolute;
-    right: -3px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 1.5px;
-    background: #2a5590;
-  }}
-  .conf-block.east .round-col-body .team-node::after {{
-    content: '';
-    position: absolute;
-    left: -3px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 1.5px;
-    background: #2a5590;
-  }}
-  /* Vertical connector spanning between the two team card centers in each matchup */
+  /* ── Bracket connector lines (90-degree arms) ───────────────────────── */
+  /* Step 1 — internal matchup arm: vertical bar spanning the two team-card centers
+     within every matchup (24%–76% of matchup height ≈ top-card mid to bottom-card mid).
+     Positioned 7px outside the content edge, in the column gap. */
   .conf-block.west .round-col-body .matchup::after {{
     content: '';
     position: absolute;
-    right: -3px;
-    top: 25%;
-    height: 50%;
+    right: -7px;
+    top: 24%;
+    height: 52%;
     width: 0;
-    border-right: 1.5px solid #2a5590;
+    border-right: 1.5px solid rgba(255,255,255,0.85);
   }}
   .conf-block.east .round-col-body .matchup::after {{
     content: '';
     position: absolute;
-    left: -3px;
+    left: -7px;
+    top: 24%;
+    height: 52%;
+    width: 0;
+    border-left: 1.5px solid rgba(255,255,255,0.85);
+  }}
+  /* Step 2 — pair arm: vertical bar on .matchup-pair spanning 25%–75% of its height,
+     connecting the midpoints of the two matchups inside it (the "gather" bar). */
+  .conf-block.west .matchup-pair::after {{
+    content: '';
+    position: absolute;
+    right: -7px;
     top: 25%;
     height: 50%;
     width: 0;
-    border-left: 1.5px solid #2a5590;
+    border-right: 1.5px solid rgba(255,255,255,0.85);
+  }}
+  .conf-block.east .matchup-pair::after {{
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 25%;
+    height: 50%;
+    width: 0;
+    border-left: 1.5px solid rgba(255,255,255,0.85);
+  }}
+  /* Step 3 — bridge: horizontal line from the pair arm's midpoint (top: 50%) to the
+     next round's matchup. Width covers the column gap; card backgrounds hide any overlap.
+     West R1→R2: R1 right-pad 18px + R2 left-pad 14px − 7px arm = 25px → right:-32px w:25px.
+     West R2→CF: R2 right-pad 3px + CF left-pad 3px − 7px arm ≈ −1px (arm already overlaps CF).
+     West CF→Finals: CF right-pad 14px + Finals left-pad 6px − 7px arm = 13px → right:-20px w:13px.
+     CF has no matchup-pair wrapper, so the bridge uses matchup::before instead. */
+  .conf-block.west .r1 .matchup-pair::before {{
+    content: '';
+    position: absolute;
+    right: -32px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 25px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.85);
+  }}
+  .conf-block.west .r3 .matchup::before {{
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 13px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.85);
+  }}
+  .conf-block.east .r1 .matchup-pair::before {{
+    content: '';
+    position: absolute;
+    left: -32px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 25px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.85);
+  }}
+  .conf-block.east .r3 .matchup::before {{
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 13px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.85);
   }}
 
   /* ── Upsets panel ────────────────────────────────────────────────────── */
@@ -365,35 +476,34 @@ st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 # ---------------------------------------------------------------------------
 
 def _team_node_html(node: dict, is_champion: bool = False) -> str:
-    """Render a single team card as HTML."""
-    seed = node["seed"]
-    # Seed badge color: gold=1, green=2-3, blue=4-5, purple=6-8
-    if seed == 1:
-        badge_bg = "#b8860b"
-    elif seed <= 3:
-        badge_bg = "#2a7a30"
-    elif seed <= 5:
-        badge_bg = "#1a5899"
-    else:
-        badge_bg = "#4a3a6a"
-    champ_cls = " champion" if is_champion else ""
+    """Render a single team card as HTML (2K26 pill style)."""
     abbrev = node["abbrev"]
+    seed = node["seed"]
     url = node["logo_url"]
+    prob_pct = f"{node['cond_win_prob']:.0%}"
+    champ_cls = " champion" if is_champion else ""
+
+    # Primary team color → gradient fading right so dark logo area blends in
+    primary = _TEAM_COLORS.get(abbrev, ("#1a3a5c", "#0a1929", "#0a1929"))[0]
+    pill_bg = (
+        f"linear-gradient(90deg, {primary} 0%, {primary}cc 55%, {primary}55 85%, transparent 100%)"
+    )
+    # Darker solid version of primary for logo background: 40% opacity over dark base
+    logo_bg = f"{primary}66"
+
     logo = (
         f'<img class="team-logo" src="{url}" '
-        f'onerror="this.style.display=\'none\';'
-        f'this.nextSibling.style.display=\'flex\';" '
+        f'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';" '
         f'alt="{abbrev}">'
         f'<span class="team-logo-fallback" style="display:none">{abbrev}</span>'
     )
-    prob_pct = f"{node['cond_win_prob']:.0%}"
     return (
         f'<div class="team-node{champ_cls}">'
-        f'<div class="team-seed-badge" style="background:{badge_bg}">{seed}</div>'
-        f'{logo}'
-        f'<div class="team-info">'
+        f'<div class="team-pill" style="background:{pill_bg}">'
+        f'<div class="team-seed-badge">{seed}</div>'
         f'<span class="team-abbrev">{abbrev}</span>'
         f'</div>'
+        f'<div class="team-logo-area" style="background:{logo_bg}">{logo}</div>'
         f'<span class="team-prob">{prob_pct}</span>'
         f'</div>'
     )
@@ -420,15 +530,24 @@ def _round_col_html(
     label: str,
     champion_abbrev: str | None = None,
     is_finals: bool = False,
+    css_class: str = "",
 ) -> str:
     """Render one round column (label + all matchups)."""
-    inner = "".join(
+    rendered = [
         _matchup_html(m, champion_abbrev=champion_abbrev, is_finals=is_finals)
         for m in matchups
-    )
+    ]
+    # Wrap consecutive pairs in .matchup-pair for bracket-arm connectors.
+    inner = ""
+    for i in range(0, len(rendered), 2):
+        pair = rendered[i:i + 2]
+        if len(pair) == 2:
+            inner += f'<div class="matchup-pair">{"".join(pair)}</div>'
+        else:
+            inner += pair[0]
+    extra_cls = f" {css_class}" if css_class else ""
     return (
-        f'<div class="round-col">'
-        f'<div class="round-col-header"><div class="round-label">{label}</div></div>'
+        f'<div class="round-col{extra_cls}">'
         f'<div class="round-col-body">{inner}</div>'
         f'</div>'
     )
@@ -448,28 +567,23 @@ def _render_bracket_html(bracket: dict) -> str:
     # adjacent pair of R1 matchups feeds the same R2 slot, aligning their midpoints.
     west_r1_raw = bracket["west"][1]
     west_r1_ordered = [west_r1_raw[0], west_r1_raw[3], west_r1_raw[1], west_r1_raw[2]]
-    w_r1 = _round_col_html(west_r1_ordered, "R1")
-    w_r2 = _round_col_html(bracket["west"][2], "R2")
-    w_r3 = _round_col_html(bracket["west"][3], "Conf Finals")
+    w_r1 = _round_col_html(west_r1_ordered, "R1", css_class="r1")
+    w_r2 = _round_col_html(bracket["west"][2], "R2", css_class="r2")
+    w_r3 = _round_col_html(bracket["west"][3], "Conf Finals", css_class="r3")
 
     # East columns (R3 innermost, R1 outermost right).
     # East R1 uses same vertical order for left-right symmetry.
     east_r1_raw = bracket["east"][1]
     east_r1_ordered = [east_r1_raw[0], east_r1_raw[3], east_r1_raw[1], east_r1_raw[2]]
-    e_r3 = _round_col_html(bracket["east"][3], "Conf Finals")
-    e_r2 = _round_col_html(bracket["east"][2], "R2")
-    e_r1 = _round_col_html(east_r1_ordered, "R1")
+    e_r3 = _round_col_html(bracket["east"][3], "Conf Finals", css_class="r3")
+    e_r2 = _round_col_html(bracket["east"][2], "R2", css_class="r2")
+    e_r1 = _round_col_html(east_r1_ordered, "R1", css_class="r1")
 
     # Finals centre column: labels in a separate header so the matchup card
     # is vertically centered in the remaining body space (aligns with R3 cards).
     finals_matchup = bracket["finals"][4][0]
-    champ_label = '<div class="champion-label">🏆 PREDICTED CHAMPION</div>' if champ else ""
     finals_col = (
         f'<div class="finals-col">'
-        f'<div class="finals-col-header">'
-        f'<div class="finals-label">NBA Finals</div>'
-        f'{champ_label}'
-        f'</div>'
         f'<div class="finals-col-body">'
         f'{_matchup_html(finals_matchup, champion_abbrev=champ_abbrev, is_finals=True)}'
         f'</div>'
@@ -478,13 +592,11 @@ def _render_bracket_html(bracket: dict) -> str:
 
     west_block = (
         f'<div class="conf-block west">'
-        f'<div class="conf-label">WEST</div>'
         f'<div class="conf-rounds">{w_r1}{w_r2}{w_r3}</div>'
         f'</div>'
     )
     east_block = (
         f'<div class="conf-block east">'
-        f'<div class="conf-label">EAST</div>'
         f'<div class="conf-rounds">{e_r3}{e_r2}{e_r1}</div>'
         f'</div>'
     )
@@ -536,7 +648,7 @@ _windows = sorted({r.split("_", 1)[1] for r in available_runs if "_" in r})
 panel_col, _gap_col, main_col = st.columns([1.2, 0.2, 5])
 
 with panel_col:
-    st.markdown('<div style="height:1rem"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:0.7rem"></div>', unsafe_allow_html=True)
     st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Configuration</h1>', unsafe_allow_html=True)
     selected_year = st.selectbox("Year", _years, index=0)
     selected_window = st.selectbox("Window", _windows, index=0)
@@ -567,7 +679,7 @@ _item_style = (
 
 with panel_col:
     st.markdown("---")
-    st.markdown("**Model Specification**")
+    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Specification</h1>', unsafe_allow_html=True)
     if spec is not None:
         st.markdown(f"**Training window:** {spec['window']}")
         st.markdown(f"**Observations (N):** {spec['n_obs']}")
@@ -590,7 +702,7 @@ with panel_col:
 # Main content
 # ---------------------------------------------------------------------------
 with main_col:
-    st.markdown('<h1 style="margin-top:0.6rem;margin-bottom:1rem">NBA Playoff Prediction Model</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin-top:0rem;margin-bottom:0.8rem">NBA Playoff Prediction Model</h1>', unsafe_allow_html=True)
     st.caption("Monte Carlo bracket simulation — 50,000 iterations")
 
     c1, c2, c3, c4, c5 = st.columns(5)
