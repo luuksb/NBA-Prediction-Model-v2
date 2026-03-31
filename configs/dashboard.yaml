@@ -1,0 +1,22 @@
+# configs/dashboard.yaml
+# Dashboard configuration. Read by src/dashboard/data_loader.py.
+# No code changes required when paths or CDN URLs change — edit here only.
+
+paths:
+  results_dir: results/simulations
+  model_selection_dir: results/model_selection
+  bracket_seeds_config: configs/bracket_seeds.yaml
+  team_features_path: data/final/team_season_features.parquet
+
+logos:
+  # ESPN CDN template — {abbrev} is replaced with lowercase team abbreviation
+  espn_cdn_template: "https://a.espncdn.com/i/teamlogos/nba/500/{abbrev}.png"
+
+ui:
+  upset_threshold: 0.50   # min conditional win prob for a lower seed to be flagged (rounds 2-4)
+  colors:
+    champion_border: "#FFD700"
+    default_border:  "#1a3a5c"
+    background:      "#0a1929"
+    card_background: "#0d2137"
+    accent:          "#4a9eff"
