@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src.dashboard.bracket_builder import build_bracket_structure, get_upsets
 from src.dashboard.data_loader import (
@@ -553,61 +554,243 @@ def _round_col_html(
     )
 
 
-def _render_bracket_html(bracket: dict) -> str:
-    """Build the full bracket HTML string.
+def _render_bracket_html_canvas(bracket: dict) -> str:
+    """Build the full bracket HTML string using an absolutely-positioned canvas.
 
-    Column order left → right:
-        W_R1 | W_R2 | W_R3 | Finals | E_R3 | E_R2 | E_R1
+    All 15 matchup boxes (W R1×4, W R2×2, W CF×1, Finals×1, E CF×1, E R2×2, E R1×4)
+    are placed at explicit (x, y) pixel coordinates inside a single positioned
+    container. No connector lines (added in Prompt 2).
     """
-    champ = bracket.get("champion")
+    # ── Layout constants ──────────────────────────────────────────────────────
+    CANVAS_WIDTH  = 900   # px, full bracket width
+    CANVAS_HEIGHT = 550    # px
+    BOX_W = 130            # px, matchup box width
+    BOX_H = 105            # px, matchup box height (two 36px team rows)
+
+    # ── X positions per round column ─────────────────────────────────────────
+    west_r1_x = 0
+    west_r2_x = int(CANVAS_WIDTH * 0.16)          # 211
+    west_cf_x = int(CANVAS_WIDTH * 0.22)           # 382
+    finals_x  = int(CANVAS_WIDTH * 0.50 - BOX_W / 2)  # 567
+    east_cf_x = CANVAS_WIDTH - west_cf_x - BOX_W  # 753
+    east_r2_x = CANVAS_WIDTH - west_r2_x - BOX_W  # 924
+    east_r1_x = CANVAS_WIDTH - BOX_W              # 1135
+
+    # ── Y positions: distribute 4 R1 slots evenly, then center upward ────────
+    _pad  = 20
+    _slot = (CANVAS_HEIGHT - 2 * _pad) / 4        # 170 px per R1 slot
+    r1_centers = [_pad + i * _slot + _slot / 2 for i in range(4)]
+    # R2 center = midpoint between the two R1 centers that feed it
+    r2_centers = [
+        (r1_centers[0] + r1_centers[1]) / 2,      # 190
+        (r1_centers[2] + r1_centers[3]) / 2,      # 530
+    ]
+    cf_center     = (r2_centers[0] + r2_centers[1]) / 2   # 360
+    finals_center = cf_center                               # 360
+
+    def _box_y(center: float) -> int:
+        return int(center - BOX_H / 2)
+
+    r1_y     = [_box_y(c) for c in r1_centers]    # [69, 239, 409, 579]
+    r2_y     = [_box_y(c) for c in r2_centers]    # [154, 494]
+    cf_y     = _box_y(cf_center)                   # 324
+    finals_y = _box_y(finals_center)               # 324
+
+    # ── Extract bracket data ─────────────────────────────────────────────────
+    champ        = bracket.get("champion")
     champ_abbrev = champ["abbrev"] if champ else None
 
-    # West columns (R1 outermost left, R3 innermost).
-    # R1 display order: [1v8, 4v5, 2v7, 3v6] (indices 0,3,1,2) so that each
-    # adjacent pair of R1 matchups feeds the same R2 slot, aligning their midpoints.
-    west_r1_raw = bracket["west"][1]
+    # R1 display order [1v8, 4v5, 2v7, 3v6] (raw indices 0,3,1,2) keeps adjacent
+    # pairs feeding the same R2 slot so midpoints align vertically.
+    west_r1_raw     = bracket["west"][1]
     west_r1_ordered = [west_r1_raw[0], west_r1_raw[3], west_r1_raw[1], west_r1_raw[2]]
-    w_r1 = _round_col_html(west_r1_ordered, "R1", css_class="r1")
-    w_r2 = _round_col_html(bracket["west"][2], "R2", css_class="r2")
-    w_r3 = _round_col_html(bracket["west"][3], "Conf Finals", css_class="r3")
+    west_r2_list    = bracket["west"][2]
+    west_cf         = bracket["west"][3][0]
 
-    # East columns (R3 innermost, R1 outermost right).
-    # East R1 uses same vertical order for left-right symmetry.
-    east_r1_raw = bracket["east"][1]
+    east_r1_raw     = bracket["east"][1]
     east_r1_ordered = [east_r1_raw[0], east_r1_raw[3], east_r1_raw[1], east_r1_raw[2]]
-    e_r3 = _round_col_html(bracket["east"][3], "Conf Finals", css_class="r3")
-    e_r2 = _round_col_html(bracket["east"][2], "R2", css_class="r2")
-    e_r1 = _round_col_html(east_r1_ordered, "R1", css_class="r1")
+    east_r2_list    = bracket["east"][2]
+    east_cf         = bracket["east"][3][0]
 
-    # Finals centre column: labels in a separate header so the matchup card
-    # is vertically centered in the remaining body space (aligns with R3 cards).
     finals_matchup = bracket["finals"][4][0]
-    finals_col = (
-        f'<div class="finals-col">'
-        f'<div class="finals-col-body">'
-        f'{_matchup_html(finals_matchup, champion_abbrev=champ_abbrev, is_finals=True)}'
-        f'</div>'
-        f'</div>'
+
+    # ── Position specs: (x, y, matchup_dict, is_finals) ──────────────────────
+    box_specs = []
+    for i, m in enumerate(west_r1_ordered):
+        box_specs.append((west_r1_x, r1_y[i], m, False))
+    for i, m in enumerate(west_r2_list):
+        box_specs.append((west_r2_x, r2_y[i], m, False))
+    box_specs.append((west_cf_x, cf_y,     west_cf,       False))
+    box_specs.append((finals_x,  finals_y, finals_matchup, True))
+    box_specs.append((east_cf_x, cf_y,     east_cf,       False))
+    for i, m in enumerate(east_r2_list):
+        box_specs.append((east_r2_x, r2_y[i], m, False))
+    for i, m in enumerate(east_r1_ordered):
+        box_specs.append((east_r1_x, r1_y[i], m, False))
+
+    # ── Generate positioned matchup boxes ────────────────────────────────────
+    html_boxes = "".join(
+        (
+            f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1;'
+            f'transform:scale(1.3);transform-origin:center center">'
+            if is_finals else
+            f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1">'
+        )
+        + f'{_matchup_html(m, champion_abbrev=champ_abbrev, is_finals=is_finals)}'
+        + f'</div>'
+        for x, y, m, is_finals in box_specs
     )
 
-    west_block = (
-        f'<div class="conf-block west">'
-        f'<div class="conf-rounds">{w_r1}{w_r2}{w_r3}</div>'
-        f'</div>'
-    )
-    east_block = (
-        f'<div class="conf-block east">'
-        f'<div class="conf-rounds">{e_r3}{e_r2}{e_r1}</div>'
-        f'</div>'
+    # ── SVG connector lines (rendered behind boxes via z-index:0) ────────────
+    # BOX_H (105) positions each box but the actual rendered height is
+    # 2 team-node rows (36px each) + 3px gap = 75px. Derive connector y-centres
+    # from actual box tops so stubs exit the visual midpoint between the two team
+    # rows, not the lower portion of the box.
+    _ACTUAL_H = 2 * 36 + 3  # 75px
+    _r1_cy  = [y + _ACTUAL_H / 2 for y in r1_y]    # actual centre of each R1 box
+    _r2_cy  = [y + _ACTUAL_H / 2 for y in r2_y]    # actual centre of each R2 box
+    _cf_cy  = cf_y     + _ACTUAL_H / 2
+    _fin_cy = finals_y + _ACTUAL_H / 2
+
+    _S = 'stroke="#6b7280" stroke-width="1.5" fill="none" opacity="0.7"'
+
+    def _arm_right(src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float) -> str:
+        """Bracket arm extending rightward: two stubs → vertical gather bar → bridge to dest."""
+        gx = (src_rx + dst_lx) / 2
+        return (
+            f'<line x1="{src_rx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{top_cy:.1f}" {_S}/>'
+            f'<line x1="{src_rx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{dst_cy:.1f}" x2="{dst_lx:.1f}" y2="{dst_cy:.1f}" {_S}/>'
+        )
+
+    def _arm_left(src_lx: float, dst_rx: float, top_cy: float, bot_cy: float, dst_cy: float) -> str:
+        """Bracket arm extending leftward: two stubs → vertical gather bar → bridge to dest."""
+        gx = (src_lx + dst_rx) / 2
+        return (
+            f'<line x1="{src_lx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{top_cy:.1f}" {_S}/>'
+            f'<line x1="{src_lx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{dst_cy:.1f}" x2="{dst_rx:.1f}" y2="{dst_cy:.1f}" {_S}/>'
+        )
+
+    def _hline(x1: float, x2: float, y: float) -> str:
+        return f'<line x1="{x1:.1f}" y1="{y:.1f}" x2="{x2:.1f}" y2="{y:.1f}" {_S}/>'
+
+    svg_lines = ""
+    # West: R1→R2 (two pairs)
+    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x, _r1_cy[0], _r1_cy[1], _r2_cy[0])
+    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x, _r1_cy[2], _r1_cy[3], _r2_cy[1])
+    # West: R2→CF
+    svg_lines += _arm_right(west_r2_x + BOX_W, west_cf_x, _r2_cy[0], _r2_cy[1], _cf_cy)
+    # West: CF→Finals (single horizontal)
+    svg_lines += _hline(west_cf_x + BOX_W, finals_x, _cf_cy)
+    # East: R1→R2 (two pairs, arms grow leftward)
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W, _r1_cy[0], _r1_cy[1], _r2_cy[0])
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W, _r1_cy[2], _r1_cy[3], _r2_cy[1])
+    # East: R2→CF
+    svg_lines += _arm_left(east_r2_x, east_cf_x + BOX_W, _r2_cy[0], _r2_cy[1], _cf_cy)
+    # East: CF→Finals (single horizontal)
+    svg_lines += _hline(east_cf_x, finals_x + BOX_W, _cf_cy)
+
+    svg_el = (
+        f'<svg style="position:absolute;top:0;left:0;width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;'
+        f'z-index:0;pointer-events:none;overflow:visible">'
+        f'{svg_lines}'
+        f'</svg>'
     )
 
-    return (
-        f'<div class="bracket-root">'
-        f'{west_block}'
-        f'{finals_col}'
-        f'{east_block}'
-        f'</div>'
-    )
+    # ── CSS scoped to team-node components (iframe has no parent page styles) ─
+    champ_border = COLORS["champion_border"]
+    _css = f"""
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+      body {{ background: {COLORS['background']}; overflow-x: auto; overflow-y: hidden;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+      .matchup {{ display: flex; flex-direction: column; gap: 3px; width: 100%; }}
+      .team-node {{
+        display: flex; flex-direction: row; align-items: stretch;
+        background: #0d1520; border: 1px solid #1e2d3d; border-radius: 4px;
+        min-height: 36px; position: relative; width: 100%; overflow: hidden;
+      }}
+      .team-node:hover {{ border-color: #4a7aaa; }}
+      .team-node.champion {{
+        border-color: {champ_border};
+        box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+      }}
+      .team-pill {{
+        display: flex; flex-direction: row; align-items: center; flex: 1; min-width: 0;
+      }}
+      .team-seed-badge {{
+        width: 18px; min-width: 18px; align-self: stretch;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 9px; font-weight: 900; color: rgba(255,255,255,0.85);
+        background: rgba(0,0,0,0.28); flex-shrink: 0;
+      }}
+      .team-abbrev {{
+        font-size: 10px; font-weight: 800; color: #ffffff;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        text-transform: uppercase; letter-spacing: 0.04em; padding: 0 4px 0 5px;
+      }}
+      .team-logo-area {{
+        width: 30px; min-width: 30px; align-self: stretch;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }}
+      .team-logo {{ width: 22px; height: 22px; object-fit: contain; }}
+      .team-logo-fallback {{
+        width: 22px; height: 22px; display: flex; align-items: center;
+        justify-content: center; font-size: 7px; font-weight: 700; color: #8a9ab0;
+      }}
+      .team-prob {{
+        font-size: 10px; font-weight: 700; color: #8aadcc; white-space: nowrap;
+        flex-shrink: 0; align-self: center; padding: 0 5px; min-width: 28px;
+        text-align: right;
+      }}
+      .team-node.champion .team-prob {{ color: {champ_border}; }}
+    """
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>{_css}</style>
+</head>
+<body>
+  <div id="outer" style="width:100%;overflow:hidden;position:relative">
+    <div id="canvas" style="position:relative;width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;transform-origin:top left">
+      {svg_el}
+      {html_boxes}
+    </div>
+  </div>
+  <script>
+    var CW = {CANVAS_WIDTH}, CH = {CANVAS_HEIGHT};
+    var canvas = document.getElementById('canvas');
+    var outer  = document.getElementById('outer');
+    function applyScale() {{
+      var w = outer.clientWidth || document.documentElement.clientWidth;
+      if (w < 10) {{ setTimeout(applyScale, 50); return; }}
+      var scale = w / CW;
+      canvas.style.transform = 'scale(' + scale + ')';
+      var newH = Math.ceil(CH * scale) + 4;
+      outer.style.height = (newH - 4) + 'px';
+      // st.components.v1.html() ignores setFrameHeight messages, so resize the
+      // parent iframe element directly. Works because Streamlit runs same-origin.
+      try {{
+        var frames = window.parent.document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {{
+          if (frames[i].contentWindow === window) {{
+            frames[i].style.height = newH + 'px';
+            frames[i].style.minHeight = newH + 'px';
+            break;
+          }}
+        }}
+      }} catch(e) {{}}
+    }}
+    applyScale();
+    setTimeout(applyScale, 100);
+    window.addEventListener('resize', applyScale);
+  </script>
+</body>
+</html>"""
 
 
 def _render_upsets_panel(upsets: list[dict]) -> None:
@@ -732,7 +915,7 @@ with main_col:
             team_features=team_features,
             spec=spec,
         )
-        st.markdown(_render_bracket_html(bracket), unsafe_allow_html=True)
+        components.html(_render_bracket_html_canvas(bracket), height=400, scrolling=False)
 
         st.subheader("Notable Upsets")
         upsets = get_upsets(
