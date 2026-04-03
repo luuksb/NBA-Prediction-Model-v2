@@ -37,7 +37,7 @@ features:
     description: Margin of victory — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_sos
     description: Strength of schedule — higher seed minus lower seed
@@ -127,7 +127,7 @@ features:
     description: Regular season wins — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: false
+    active: true
 
   - name: delta_l
     description: Regular season losses — higher seed minus lower seed
@@ -242,7 +242,7 @@ features:
     description: Steals per 100 possessions — higher seed minus lower seed
     type: float
     producing_step: steps/team_ratings
-    active: true
+    active: false
 
   - name: delta_blk_per_100_poss
     description: Blocks per 100 possessions — higher seed minus lower seed
@@ -265,23 +265,26 @@ features:
   # ── Playoff experience ────────────────────────────────────────────────────────
   - name: delta_playoff_series_wins
     description: >
-      Historical playoff series wins (cumulative, before current year) —
-      higher seed minus lower seed
+      Roster-based cumulative playoff series wins (before current year) —
+      sum of all current roster players' individual prior series wins,
+      higher seed minus lower seed. Uses exact playoff rosters for 1997+
+      (playoff_player_stats) and regular-season roster proxy for pre-1997.
     type: float
     producing_step: steps/playoff_experience
     active: true
 
   - name: delta_avg_playoff_series_wins
     description: >
-      Average playoff series wins per playoff appearance (before current year) —
-      higher seed minus lower seed
+      Roster-based average playoff series wins per player (before current year) —
+      series_wins_cum ÷ roster count, higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
     active: false
 
   - name: delta_playoff_series_played
     description: >
-      Total playoff series played historically (before current year) —
+      Roster-based cumulative playoff series played (before current year) —
+      sum of all current roster players' individual prior series played,
       higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
@@ -289,8 +292,8 @@ features:
 
   - name: delta_avg_playoff_series_played
     description: >
-      Average playoff series played per season (before current year) —
-      higher seed minus lower seed
+      Roster-based average playoff series played per player (before current year) —
+      series_played_cum ÷ roster count, higher seed minus lower seed
     type: float
     producing_step: steps/playoff_experience
     active: false
@@ -387,6 +390,25 @@ features:
     producing_step: steps/player_ratings
     active: true
 
+  - name: delta_bpm_weighted_avail
+    description: >
+      BPM-weighted availability: fraction of total team BPM quality that is
+      available (bpm_avail_sum / raw_bpm_sum). Equals 1.0 when all stars play
+      fully; lower when stars are injured. Pre-1997 assumed 1.0 —
+      higher seed minus lower seed.
+    type: float
+    producing_step: steps/player_ratings
+    active: false
+
+  - name: delta_star_bpm_avail
+    description: >
+      Top star's BPM × series availability (star1_bpm × star1_avail).
+      Captures the single best player's effective contribution —
+      higher seed minus lower seed.
+    type: float
+    producing_step: steps/player_ratings
+    active: false
+
   - name: delta_per_avail_sum
     description: Availability-weighted PER sum — higher seed minus lower seed
     type: float
@@ -399,13 +421,20 @@ features:
     producing_step: steps/player_ratings
     active: false
 
-  # ── EPM / RAPTOR — inactive (data not available) ─────────────────────────────
-  - name: delta_epm_top3_mean
-    description: Mean EPM of top-3 players — higher seed minus lower seed
+  # ── EPM-based features (data/raw/epm.parquet, seasons 2002+) ─────────────────
+
+  - name: delta_star_flag
+    description: >
+      Superstar indicator × availability: 1 × avail if any of the team's top-N
+      stars is among the top-5 superstar players that season, else 0.
+      Superstar set: EPM top-5 for seasons 2002+; BPM top-5 for pre-2002 seasons.
+      Captures the presence of a true league-best player, weighted by series availability.
+      Higher seed minus lower seed.
     type: float
     producing_step: steps/player_ratings
-    active: false  # EPM not available in raw data sources
+    active: true
 
+  # ── RAPTOR — inactive (data not available) ────────────────────────────────────
   - name: delta_raptor_top3_mean
     description: Mean RAPTOR of top-3 players — higher seed minus lower seed
     type: float
@@ -430,6 +459,18 @@ features:
     producing_step: steps/coach_experience
     active: false
 
+  # ── Matchup-level ─────────────────────────────────────────────────────────────
+  - name: delta_home_court_advantage
+    description: >
+      Binary indicator for whether home-court advantage exists for this series.
+      1 in all normal playoff years (higher seed hosts games 1, 2, 5, 7);
+      0 in 2020 (COVID bubble, Walt Disney World neutral site).
+      Already a delta — no per-team decomposition.
+    type: int
+    producing_step: steps/home_court
+    series_level: true
+    active: true
+
   # ── Pre-series player availability ────────────────────────────────────────────
   - name: top3_gp_pct_delta
     description: >
@@ -440,6 +481,7 @@ features:
       (Already a delta; not renamed to delta_ to preserve step output name.)
     type: float
     producing_step: steps/player_availability
+    series_level: true
     active: true
 
   # ── Injury-derived (Module 3 output — out-of-sample years only) ──────────────

@@ -1,0 +1,12 @@
+year,predicted_champion,predicted_prob_pct,actual_champion,actual_champion_prob_pct,correct
+2014,MIA,73.9,SAS,11.7,False
+2015,ATL,35.5,GSW,31.1,False
+2016,GSW,39.6,CLE,34.6,False
+2017,BOS,34.8,GSW,26.2,False
+2018,HOU,34.6,GSW,20.4,False
+2019,MIL,40.5,TOR,6.9,False
+2020,MIL,48.2,LAL,28.4,False
+2021,BRK,31.9,MIL,17.9,False
+2022,MIA,20.3,GSW,4.0,False
+2023,BOS,34.0,DEN,17.4,False
+2024,BOS,63.5,BOS,63.5,True

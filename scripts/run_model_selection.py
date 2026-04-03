@@ -53,21 +53,30 @@ def main() -> None:
     leaderboards = select.run_combinatorial_pipeline(df)
 
     if args.select_top:
-        # Flatten leaderboards to find the single best model across all windows/metrics
+        # For each window, pick the best model by BIC (primary selection criterion),
+        # refit on the full window data, and save as chosen_model_{window}.json.
+        import json
         import yaml
         from src.model import fit
 
-        all_dfs = [lb for metrics in leaderboards.values() for lb in metrics.values()]
-        top_row = max(all_dfs, key=lambda d: d.iloc[0]["mcfadden_r2"]).iloc[0]
-        features = top_row["features"]
-        window_name = top_row["window"]
         with open(Path("configs/training_windows.yaml")) as f:
             windows_cfg = yaml.safe_load(f)
-        window = next(w for w in windows_cfg["windows"] if w["name"] == window_name)
-        full_spec = fit.fit_logit(df, features, window["name"],
-                                  window["start_year"], window["end_year"])
-        path = select.save_chosen_model(full_spec)
-        logger.info("Chosen model saved to %s", path)
+
+        results_dir = Path("results/model_selection")
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        for window_name, metrics in leaderboards.items():
+            bic_lb = metrics["bic"]   # BIC leaderboard for this window (lower = better)
+            top_features = bic_lb.iloc[0]["features"]
+            window_meta = next(w for w in windows_cfg["windows"] if w["name"] == window_name)
+            spec = fit.fit_logit(
+                df, top_features, window_name,
+                window_meta["start_year"], window_meta["end_year"],
+            )
+            out_path = results_dir / f"chosen_model_{window_name}.json"
+            with open(out_path, "w") as f:
+                json.dump(spec, f, indent=2)
+            logger.info("Chosen model (%s) saved to %s", window_name, out_path)
 
     logger.info("=== Model Selection DONE ===")
 
