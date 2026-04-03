@@ -17,6 +17,7 @@ from pathlib import Path
 # Add repo root so src/dashboard imports resolve
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -476,12 +477,22 @@ st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 # HTML rendering helpers
 # ---------------------------------------------------------------------------
 
-def _team_node_html(node: dict, is_champion: bool = False) -> str:
+def _team_node_html(
+    node: dict,
+    is_champion: bool = False,
+    prob_mode: str = "Matchup Win %",
+    champ_prob: float | None = None,
+    is_finals: bool = False,
+) -> str:
     """Render a single team card as HTML (2K26 pill style)."""
     abbrev = node["abbrev"]
     seed = node["seed"]
     url = node["logo_url"]
-    prob_pct = f"{node['cond_win_prob']:.0%}"
+    if prob_mode == "Championship %" and champ_prob is not None:
+        prob_pct = f"🏆 {champ_prob:.0%}" if is_finals else f"{champ_prob:.0%}"
+    else:
+        prob_pct = f"{node['cond_win_prob']:.0%}"
+    finalist_cls = " finalist" if (is_finals and prob_mode == "Championship %") else ""
     champ_cls = " champion" if is_champion else ""
 
     # Primary team color → gradient fading right so dark logo area blends in
@@ -499,7 +510,7 @@ def _team_node_html(node: dict, is_champion: bool = False) -> str:
         f'<span class="team-logo-fallback" style="display:none">{abbrev}</span>'
     )
     return (
-        f'<div class="team-node{champ_cls}">'
+        f'<div class="team-node{champ_cls}{finalist_cls}">'
         f'<div class="team-pill" style="background:{pill_bg}">'
         f'<div class="team-seed-badge">{seed}</div>'
         f'<span class="team-abbrev">{abbrev}</span>'
@@ -511,17 +522,23 @@ def _team_node_html(node: dict, is_champion: bool = False) -> str:
 
 
 def _matchup_html(
-    matchup: dict, champion_abbrev: str | None = None, is_finals: bool = False
+    matchup: dict,
+    champion_abbrev: str | None = None,
+    is_finals: bool = False,
+    prob_mode: str = "Matchup Win %",
+    champ_probs: dict | None = None,
 ) -> str:
     """Render a matchup (two team cards) as HTML."""
     hi = matchup["high"]
     lo = matchup["low"]
     hi_champ = is_finals and hi["abbrev"] == champion_abbrev
     lo_champ = is_finals and lo["abbrev"] == champion_abbrev
+    hi_cp = champ_probs.get(hi["abbrev"]) if champ_probs else None
+    lo_cp = champ_probs.get(lo["abbrev"]) if champ_probs else None
     return (
         f'<div class="matchup">'
-        f'{_team_node_html(hi, is_champion=hi_champ)}'
-        f'{_team_node_html(lo, is_champion=lo_champ)}'
+        f'{_team_node_html(hi, is_champion=hi_champ, prob_mode=prob_mode, champ_prob=hi_cp, is_finals=is_finals)}'
+        f'{_team_node_html(lo, is_champion=lo_champ, prob_mode=prob_mode, champ_prob=lo_cp, is_finals=is_finals)}'
         f'</div>'
     )
 
@@ -554,7 +571,11 @@ def _round_col_html(
     )
 
 
-def _render_bracket_html_canvas(bracket: dict) -> str:
+def _render_bracket_html_canvas(
+    bracket: dict,
+    prob_mode: str = "Matchup Win %",
+    champ_probs: dict | None = None,
+) -> str:
     """Build the full bracket HTML string using an absolutely-positioned canvas.
 
     All 15 matchup boxes (W R1×4, W R2×2, W CF×1, Finals×1, E CF×1, E R2×2, E R1×4)
@@ -636,7 +657,7 @@ def _render_bracket_html_canvas(bracket: dict) -> str:
             if is_finals else
             f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1">'
         )
-        + f'{_matchup_html(m, champion_abbrev=champ_abbrev, is_finals=is_finals)}'
+        + f'{_matchup_html(m, champion_abbrev=champ_abbrev, is_finals=is_finals, prob_mode=prob_mode, champ_probs=champ_probs)}'
         + f'</div>'
         for x, y, m, is_finals in box_specs
     )
@@ -652,26 +673,30 @@ def _render_bracket_html_canvas(bracket: dict) -> str:
     _cf_cy  = cf_y     + _ACTUAL_H / 2
     _fin_cy = finals_y + _ACTUAL_H / 2
 
-    _S = 'stroke="#6b7280" stroke-width="1.5" fill="none" opacity="0.7"'
+    _S = 'stroke="#6b7280" stroke-width="1.5" fill="none" opacity="1"'
 
-    def _arm_right(src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float) -> str:
+    def _arm_right(src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float) -> str:
         """Bracket arm extending rightward: two stubs → vertical gather bar → bridge to dest."""
-        gx = (src_rx + dst_lx) / 2
+        gx = (src_rx + dst_lx)
+        gy_top = dst_cy - box_height/3
+        gy_bot = dst_cy + box_height/3
         return (
             f'<line x1="{src_rx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{top_cy:.1f}" {_S}/>'
             f'<line x1="{src_rx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
-            f'<line x1="{gx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
-            f'<line x1="{gx:.1f}" y1="{dst_cy:.1f}" x2="{dst_lx:.1f}" y2="{dst_cy:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{gy_top:.1f}" {_S}/>'
+            f'<line x1="{gx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{gy_bot:.1f}" {_S}/>'
         )
 
-    def _arm_left(src_lx: float, dst_rx: float, top_cy: float, bot_cy: float, dst_cy: float) -> str:
+    def _arm_left(src_lx: float, dst_rx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float) -> str:
         """Bracket arm extending leftward: two stubs → vertical gather bar → bridge to dest."""
-        gx = (src_lx + dst_rx) / 2
+        gx = (src_lx - dst_rx)
+        gy_top = dst_cy - box_height/3
+        gy_bot = dst_cy + box_height/3
         return (
-            f'<line x1="{src_lx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{top_cy:.1f}" {_S}/>'
-            f'<line x1="{src_lx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
-            f'<line x1="{gx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
-            f'<line x1="{gx:.1f}" y1="{dst_cy:.1f}" x2="{dst_rx:.1f}" y2="{dst_cy:.1f}" {_S}/>'
+            f'<line x1="{src_lx:.1f}" y1="{top_cy:.1f}" x2="{dst_rx:.1f}" y2="{top_cy:.1f}" {_S}/>'
+            f'<line x1="{src_lx:.1f}" y1="{bot_cy:.1f}" x2="{dst_rx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
+            f'<line x1="{dst_rx:.1f}" y1="{top_cy:.1f}" x2="{dst_rx:.1f}" y2="{gy_top:.1f}" {_S}/>'
+            f'<line x1="{dst_rx:.1f}" y1="{bot_cy:.1f}" x2="{dst_rx:.1f}" y2="{gy_bot:.1f}" {_S}/>'
         )
 
     def _hline(x1: float, x2: float, y: float) -> str:
@@ -679,19 +704,19 @@ def _render_bracket_html_canvas(bracket: dict) -> str:
 
     svg_lines = ""
     # West: R1→R2 (two pairs)
-    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x, _r1_cy[0], _r1_cy[1], _r2_cy[0])
-    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x, _r1_cy[2], _r1_cy[3], _r2_cy[1])
+    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x - BOX_W/2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H)
+    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x - BOX_W/2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H)
     # West: R2→CF
-    svg_lines += _arm_right(west_r2_x + BOX_W, west_cf_x, _r2_cy[0], _r2_cy[1], _cf_cy)
+    svg_lines += _arm_right(west_r2_x + BOX_W, west_cf_x - BOX_W*1.3, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H)
     # West: CF→Finals (single horizontal)
-    svg_lines += _hline(west_cf_x + BOX_W, finals_x, _cf_cy)
+    svg_lines += _hline(west_cf_x + BOX_W, finals_x - 0.3*BOX_W/2, _cf_cy)
     # East: R1→R2 (two pairs, arms grow leftward)
-    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W, _r1_cy[0], _r1_cy[1], _r2_cy[0])
-    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W, _r1_cy[2], _r1_cy[3], _r2_cy[1])
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W/2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H)
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W/2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H)
     # East: R2→CF
-    svg_lines += _arm_left(east_r2_x, east_cf_x + BOX_W, _r2_cy[0], _r2_cy[1], _cf_cy)
+    svg_lines += _arm_left(east_r2_x, east_cf_x + BOX_W*0.2, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H)
     # East: CF→Finals (single horizontal)
-    svg_lines += _hline(east_cf_x, finals_x + BOX_W, _cf_cy)
+    svg_lines += _hline(east_cf_x, finals_x + 1.15*BOX_W, _cf_cy)
 
     svg_el = (
         f'<svg style="position:absolute;top:0;left:0;width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;'
@@ -714,6 +739,10 @@ def _render_bracket_html_canvas(bracket: dict) -> str:
       }}
       .team-node:hover {{ border-color: #4a7aaa; }}
       .team-node.champion {{
+        border-color: {champ_border};
+        box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+      }}
+      .team-node.finalist {{
         border-color: {champ_border};
         box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
       }}
@@ -746,6 +775,7 @@ def _render_bracket_html_canvas(bracket: dict) -> str:
         text-align: right;
       }}
       .team-node.champion .team-prob {{ color: {champ_border}; }}
+      .team-node.finalist .team-prob {{ color: {champ_border}; }}
     """
 
     return f"""<!DOCTYPE html>
@@ -845,6 +875,7 @@ sim = load_simulation_results(selected_run)
 summary = sim["summary"]
 adv_df = sim["round_advancement"]
 champ_df = sim["championship_probs"]
+champ_probs_dict: dict[str, float] = dict(zip(champ_df["team"], champ_df["championship_prob"]))
 year: int = summary["year"]
 window: str = summary["window"]
 
@@ -898,6 +929,12 @@ with main_col:
 
     st.divider()
 
+    prob_mode = st.radio(
+        "Probability Mode",
+        ["Matchup Win %", "Championship %"],
+        horizontal=True,
+    )
+
     seeds = load_bracket_seeds(year)
     if not seeds:
         st.warning(
@@ -915,7 +952,11 @@ with main_col:
             team_features=team_features,
             spec=spec,
         )
-        components.html(_render_bracket_html_canvas(bracket), height=400, scrolling=False)
+        components.html(
+            _render_bracket_html_canvas(bracket, prob_mode=prob_mode, champ_probs=champ_probs_dict),
+            height=400,
+            scrolling=False,
+        )
 
         st.subheader("Notable Upsets")
         upsets = get_upsets(
@@ -927,3 +968,23 @@ with main_col:
             spec=spec,
         )
         _render_upsets_panel(upsets)
+
+        if prob_mode == "Championship %":
+            st.markdown("---")
+            st.subheader("Championship Probability — All Teams")
+            west_set = set(seeds["west"])
+            east_set = set(seeds["east"])
+            rows = []
+            for _, row in champ_df.sort_values("championship_prob", ascending=False).iterrows():
+                team = row["team"]
+                prob = row["championship_prob"]
+                if team in west_set:
+                    seed_n = seeds["west"].index(team) + 1
+                    label = f"W{seed_n} {team}  {prob:.0%}"
+                    rows.append({"Team": label, "West": prob, "East": 0.0})
+                else:
+                    seed_n = seeds["east"].index(team) + 1
+                    label = f"E{seed_n} {team}  {prob:.0%}"
+                    rows.append({"Team": label, "West": 0.0, "East": prob})
+            bar_df = pd.DataFrame(rows).set_index("Team")
+            st.bar_chart(bar_df, color=["#1D428A", "#CE1141"])
