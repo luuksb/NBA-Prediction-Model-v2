@@ -7,6 +7,8 @@ paths:
   model_selection_dir: results/model_selection
   bracket_seeds_config: configs/bracket_seeds.yaml
   team_features_path: data/final/team_season_features.parquet
+  series_dataset_path: data/final/series_dataset.parquet
+  training_windows_config: configs/training_windows.yaml
 
 logos:
   # ESPN CDN template — {abbrev} is replaced with lowercase team abbreviation

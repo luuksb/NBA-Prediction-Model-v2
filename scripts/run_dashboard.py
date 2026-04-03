@@ -17,11 +17,14 @@ from pathlib import Path
 # Add repo root so src/dashboard imports resolve
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import numpy as np
 import pandas as pd
+import statsmodels.api as sm
 import streamlit as st
 import streamlit.components.v1 as components
+import yaml
 
-from src.dashboard.bracket_builder import build_bracket_structure, get_upsets
+from src.dashboard.bracket_builder import build_bracket_structure
 from src.dashboard.data_loader import (
     list_available_runs,
     load_bracket_seeds,
@@ -429,27 +432,7 @@ _GLOBAL_CSS = f"""
     background: rgba(255,255,255,0.85);
   }}
 
-  /* ── Upsets panel ────────────────────────────────────────────────────── */
-  .upsets-grid {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 8px;
-  }}
-  .upset-card {{
-    background: {COLORS['card_background']};
-    border: 1.5px solid {COLORS['default_border']};
-    border-radius: 6px;
-    padding: 10px 14px;
-    min-width: 200px;
-    max-width: 270px;
-  }}
-  .upset-round  {{ font-size: 10px; color: #607d8b; margin-bottom: 2px; }}
-  .upset-matchup {{ font-size: 11px; color: #90a4ae; margin-bottom: 4px; }}
-  .upset-underdog {{ font-size: 14px; font-weight: 700; color: #ffffff; }}
-  .upset-prob   {{ font-size: 13px; font-weight: 700; color: #ff9f40; margin-top: 2px; }}
-
-  /* ── Text visibility on dark background ──────────────────────────────── */
+/* ── Text visibility on dark background ──────────────────────────────── */
   .stApp h1, .stApp h2, .stApp h3, .stApp h4 {{ color: #ffffff !important; }}
   .stApp p {{ color: #e0e0e0 !important; }}
   [data-testid="stMetricValue"] {{ color: #ffffff !important; }}
@@ -489,10 +472,10 @@ def _team_node_html(
     seed = node["seed"]
     url = node["logo_url"]
     if prob_mode == "Championship %" and champ_prob is not None:
-        prob_pct = f"🏆 {champ_prob:.0%}" if is_finals else f"{champ_prob:.0%}"
+        prob_pct = f"🏆 {champ_prob:.0%}" if is_champion else f"{champ_prob:.0%}"
     else:
         prob_pct = f"{node['cond_win_prob']:.0%}"
-    finalist_cls = " finalist" if (is_finals and prob_mode == "Championship %") else ""
+    finalist_cls = " finalist" if (is_champion and prob_mode == "Championship %") else ""
     champ_cls = " champion" if is_champion else ""
 
     # Primary team color → gradient fading right so dark logo area blends in
@@ -823,25 +806,116 @@ def _render_bracket_html_canvas(
 </html>"""
 
 
-def _render_upsets_panel(upsets: list[dict]) -> None:
-    """Render the upsets panel as styled HTML cards."""
-    if not upsets:
-        st.info("No notable upsets predicted.")
-        return
+def _render_champ_prob_chart_html(
+    champ_df: pd.DataFrame,
+    seeds: dict[str, list[str]],
+) -> str:
+    """Return self-contained HTML for the championship probability bar chart.
 
-    round_labels = {1: "Round 1", 2: "Conf Semis", 3: "Conf Finals", 4: "Finals"}
-    cards = ""
-    for u in upsets:
-        rl = round_labels.get(u["round"], f"Round {u['round']}")
-        cards += (
-            f'<div class="upset-card">'
-            f'<div class="upset-round">{rl}</div>'
-            f'<div class="upset-matchup">{u["matchup"]}</div>'
-            f'<div class="upset-underdog">{u["underdog"]} (#{u["underdog_seed"]})</div>'
-            f'<div class="upset-prob">{u["cond_win_prob"]:.0%} win probability</div>'
+    Bars are sorted descending by probability, colored West=blue / East=red,
+    with team logo images along the x-axis.
+    """
+    west_set = set(seeds.get("west", []))
+    sorted_df = champ_df.sort_values("championship_prob", ascending=False).reset_index(drop=True)
+
+    max_prob = float(sorted_df["championship_prob"].max()) or 1.0
+    MAX_BAR_H = 160
+
+    bar_cells = ""
+    logo_cells = ""
+    for _, row in sorted_df.iterrows():
+        team = str(row["team"])
+        prob = float(row["championship_prob"])
+        color = "#1D428A" if team in west_set else "#CE1141"
+        bar_h = max(2, int(MAX_BAR_H * prob / max_prob))
+        pct_label = f"{prob:.1%}" if prob < 0.005 else f"{prob:.0%}"
+        url = logo_url(team)
+
+        bar_cells += (
+            f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
+            f'<span style="font-size:9px;color:#ccc;margin-bottom:2px;white-space:nowrap">{pct_label}</span>'
+            f'<div style="width:80%;height:{bar_h}px;background:{color};border-radius:2px 2px 0 0"></div>'
             f'</div>'
         )
-    st.markdown(f'<div class="upsets-grid">{cards}</div>', unsafe_allow_html=True)
+        logo_cells += (
+            f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
+            f'<img src="{url}" style="width:22px;height:22px;object-fit:contain" '
+            f'onerror="this.style.visibility=\'hidden\'">'
+            f'<span style="font-size:8px;color:#777;margin-top:1px">{team}</span>'
+            f'</div>'
+        )
+
+    return (
+        f'<div style="font-family:sans-serif;background:transparent;width:100%">'
+        f'<div style="display:flex;align-items:flex-end;width:100%;height:{MAX_BAR_H + 22}px;'
+        f'border-bottom:1px solid #444">'
+        f'{bar_cells}'
+        f'</div>'
+        f'<div style="display:flex;width:100%;margin-top:4px">'
+        f'{logo_cells}'
+        f'</div>'
+        f'</div>'
+    )
+
+
+@st.cache_data
+def _compute_model_performance(
+    window: str,
+    features: tuple[str, ...],
+    series_dataset_path: str,
+    training_windows_config: str,
+) -> dict:
+    """Fit logistic regression for the given window and return performance metrics.
+
+    Returns dict with keys: pseudo_r2, auc, brier, n_obs, feat_stats (list of dicts).
+    Results are cached so the fit only runs once per window/feature combination.
+    """
+    with open(training_windows_config) as f:
+        tw_cfg = yaml.safe_load(f)
+
+    window_row = next(w for w in tw_cfg["windows"] if w["name"] == window)
+    start_year, end_year = window_row["start_year"], window_row["end_year"]
+
+    df = pd.read_parquet(series_dataset_path)
+    sub = df[(df["year"] >= start_year) & (df["year"] <= end_year)].dropna(
+        subset=list(features) + ["higher_seed_wins"]
+    )
+
+    X = sm.add_constant(sub[list(features)])
+    y = sub["higher_seed_wins"].astype(float)
+    result = sm.Logit(y, X).fit(disp=0)
+
+    probs = result.predict(X).values
+    y_arr = y.values
+
+    # AUC via trapezoidal rule (no sklearn dependency)
+    order = np.argsort(probs)[::-1]
+    y_s = y_arr[order]
+    tp = np.cumsum(y_s)
+    fp = np.cumsum(1 - y_s)
+    tpr = tp / tp[-1]
+    fpr = fp / fp[-1]
+    auc = float(np.abs(np.trapz(tpr, fpr)))
+
+    brier = float(np.mean((probs - y_arr) ** 2))
+
+    feat_stats = [
+        {
+            "Feature": feat,
+            "Coef.": round(float(result.params[feat]), 4),
+            "z": round(float(result.tvalues[feat]), 2),
+            "p-value": float(result.pvalues[feat]),
+        }
+        for feat in features
+    ]
+
+    return {
+        "pseudo_r2": float(result.prsquared),
+        "auc": auc,
+        "brier": brier,
+        "n_obs": len(sub),
+        "feat_stats": feat_stats,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -886,7 +960,7 @@ except FileNotFoundError:
     spec = None
 
 _item_style = (
-    "display:block;background:#1e1e1e;border:1px solid #333;"
+    "display:block;width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;"
     "border-radius:3px;padding:2px 6px;font-family:monospace;"
     "font-size:12px;color:#ffffff;margin:3px 0;"
 )
@@ -898,19 +972,62 @@ with panel_col:
         st.markdown(f"**Training window:** {spec['window']}")
         st.markdown(f"**Observations (N):** {spec['n_obs']}")
         st.markdown("**Features:**")
-        for feat in spec["features"]:
-            coeff = spec["coefficients"].get(feat, 0.0)
-            st.markdown(
-                f'<div style="{_item_style}">{feat} ({coeff:+.4f})</div>',
-                unsafe_allow_html=True,
-            )
-        intercept = spec["intercept"]
-        st.markdown(
-            f'<div style="{_item_style}">intercept ({intercept:+.4f})</div>',
-            unsafe_allow_html=True,
+        pills_html = "".join(
+            f'<div style="{_item_style}">{feat} ({spec["coefficients"].get(feat, 0.0):+.4f})</div>'
+            for feat in spec["features"]
         )
+        pills_html += f'<div style="{_item_style}">intercept ({spec["intercept"]:+.4f})</div>'
+        st.markdown(pills_html, unsafe_allow_html=True)
     else:
         st.warning(f"Model spec not found for window '{window}'.")
+
+    # ── Model performance ─────────────────────────────────────────────────
+    if spec is not None:
+        st.markdown("---")
+        st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Performance</h1>', unsafe_allow_html=True)
+        series_ds_path = cfg["paths"]["series_dataset_path"]
+        tw_config_path = cfg["paths"]["training_windows_config"]
+        perf = _compute_model_performance(
+            window,
+            tuple(spec["features"]),
+            series_ds_path,
+            tw_config_path,
+        )
+
+        feat_rows = ""
+        for fs in perf["feat_stats"]:
+            sig = "***" if fs["p-value"] < 0.001 else ("**" if fs["p-value"] < 0.01 else ("*" if fs["p-value"] < 0.05 else "·"))
+            feat_rows += (
+                f'<tr>'
+                f'<td style="padding:3px 6px;color:#ccc;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{fs["Feature"]}</td>'
+                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["Coef."]:+.4f}</td>'
+                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["z"]:.2f}</td>'
+                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["p-value"]:.4f}</td>'
+                f'<td style="padding:3px 6px;text-align:center;color:#ff9f40;font-size:10px">{sig}</td>'
+                f'</tr>'
+            )
+        perf_block = (
+            "".join(
+                f'<div style="{_item_style}">{label}: {val}</div>'
+                for label, val in [
+                    ("McFadden R²", f"{perf['pseudo_r2']:.3f}"),
+                    ("AUC-ROC",     f"{perf['auc']:.3f}"),
+                    ("Brier Score", f"{perf['brier']:.4f}"),
+                ]
+            )
+            + '<div style="height:0.5rem"></div>'
+            + '<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#1a1a1a;border-radius:4px;overflow:hidden">'
+            + '<thead><tr style="background:#222">'
+            + '<th style="width:42%;padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Feature</th>'
+            + '<th style="width:20%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">Coef.</th>'
+            + '<th style="width:12%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">z</th>'
+            + '<th style="width:18%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">p</th>'
+            + '<th style="width:8%;padding:4px 6px;text-align:center;color:#90a4ae;font-size:10px;font-weight:600"></th>'
+            + '</tr></thead>'
+            + f'<tbody>{feat_rows}</tbody>'
+            + '</table>'
+        )
+        st.markdown(perf_block, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Main content
@@ -958,33 +1075,34 @@ with main_col:
             scrolling=False,
         )
 
-        st.subheader("Notable Upsets")
-        upsets = get_upsets(
-            seeds["east"],
-            seeds["west"],
-            adv_df,
-            upset_threshold=cfg["ui"]["upset_threshold"],
-            team_features=team_features,
-            spec=spec,
-        )
-        _render_upsets_panel(upsets)
+        # ── Championship probability bar chart + longest shots ──────────────
+        st.markdown('<hr style="margin:6px 0;border-color:#333">', unsafe_allow_html=True)
+        chart_col, _gap_col, shots_col = st.columns([3, 0.25, 1.2])
 
-        if prob_mode == "Championship %":
-            st.markdown("---")
-            st.subheader("Championship Probability — All Teams")
-            west_set = set(seeds["west"])
-            east_set = set(seeds["east"])
-            rows = []
-            for _, row in champ_df.sort_values("championship_prob", ascending=False).iterrows():
-                team = row["team"]
-                prob = row["championship_prob"]
-                if team in west_set:
-                    seed_n = seeds["west"].index(team) + 1
-                    label = f"W{seed_n} {team}  {prob:.0%}"
-                    rows.append({"Team": label, "West": prob, "East": 0.0})
-                else:
-                    seed_n = seeds["east"].index(team) + 1
-                    label = f"E{seed_n} {team}  {prob:.0%}"
-                    rows.append({"Team": label, "West": 0.0, "East": prob})
-            bar_df = pd.DataFrame(rows).set_index("Team")
-            st.bar_chart(bar_df, color=["#1D428A", "#CE1141"])
+        with chart_col:
+            st.subheader("Championship Probabilities")
+            components.html(
+                _render_champ_prob_chart_html(champ_df, seeds),
+                height=250,
+                scrolling=False,
+            )
+
+        with shots_col:
+            st.subheader("Longest Shots")
+            nonzero = (
+                champ_df[champ_df["championship_prob"] > 0]
+                .sort_values("championship_prob")
+                .head(3)
+            )
+            for _, row in nonzero.iterrows():
+                prob = float(row["championship_prob"])
+                n_wins = int(round(prob * n_sims))
+                st.markdown(
+                    f'<div style="margin-bottom:12px">'
+                    f'<div style="font-size:12px;color:#90a4ae;margin-bottom:1px">{row["team"]}</div>'
+                    f'<div style="font-size:24px;font-weight:700;color:#ffffff;line-height:1.1">{prob:.3%}</div>'
+                    f'<div style="font-size:11px;color:#ffffff;margin-top:2px">{n_wins} / {n_sims:,} sims</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
