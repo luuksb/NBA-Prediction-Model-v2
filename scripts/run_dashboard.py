@@ -935,8 +935,8 @@ _windows = sorted({r.split("_", 1)[1] for r in available_runs if "_" in r})
 panel_col, _gap_col, main_col = st.columns([1.2, 0.2, 5])
 
 with panel_col:
-    st.markdown('<div style="height:0.7rem"></div>', unsafe_allow_html=True)
-    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Configuration</h1>', unsafe_allow_html=True)
+    st.markdown('<div style="height:0.3rem"></div>', unsafe_allow_html=True)
+    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Configuration</h1>', unsafe_allow_html=True)
     selected_year = st.selectbox("Year", _years, index=0)
     selected_window = st.selectbox("Window", _windows, index=0)
     selected_run = f"{selected_year}_{selected_window}"
@@ -966,8 +966,8 @@ _item_style = (
 )
 
 with panel_col:
-    st.markdown("---")
-    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Specification</h1>', unsafe_allow_html=True)
+    st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#444">', unsafe_allow_html=True)
+    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Specification</h1>', unsafe_allow_html=True)
     if spec is not None:
         st.markdown(f"**Training window:** {spec['window']}")
         st.markdown(f"**Observations (N):** {spec['n_obs']}")
@@ -983,8 +983,8 @@ with panel_col:
 
     # ── Model performance ─────────────────────────────────────────────────
     if spec is not None:
-        st.markdown("---")
-        st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Performance</h1>', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#444">', unsafe_allow_html=True)
+        st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Performance</h1>', unsafe_allow_html=True)
         series_ds_path = cfg["paths"]["series_dataset_path"]
         tw_config_path = cfg["paths"]["training_windows_config"]
         perf = _compute_model_performance(
@@ -1076,7 +1076,7 @@ with main_col:
         )
 
         # ── Championship probability bar chart + longest shots ──────────────
-        st.markdown('<hr style="margin:6px 0;border-color:#333">', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:2px 0;border-color:#333">', unsafe_allow_html=True)
         chart_col, _gap_col, shots_col = st.columns([3, 0.25, 1.2])
 
         with chart_col:
