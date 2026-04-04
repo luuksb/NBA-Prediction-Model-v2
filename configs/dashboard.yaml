@@ -8,6 +8,7 @@ paths:
   bracket_seeds_config: configs/bracket_seeds.yaml
   team_features_path: data/final/team_season_features.parquet
   series_dataset_path: data/final/series_dataset.parquet
+  playoff_series_dir: data/raw/playoff_series
   training_windows_config: configs/training_windows.yaml
 
 logos:
