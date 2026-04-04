@@ -344,11 +344,19 @@ def _build_finals_matchup(
     east_rep = _pick_rep(east_candidates, east_seeds, "east", 4, adv_df, logo_url_fn)
     west_rep = _pick_rep(west_candidates, west_seeds, "west", 4, adv_df, logo_url_fn)
 
-    # For Finals, assign high by higher adv_prob at R4
-    if east_rep["adv_prob"] >= west_rep["adv_prob"]:
-        hi, lo = east_rep, west_rep
+    # For Finals, assign high by regular-season wins — mirrors bracket.py's
+    # _make_series tiebreaker when both teams are #1 seeds (tied seed rank).
+    # Falls back to R4 adv_prob if team_features or "w" column is unavailable.
+    east_w: float = 0.0
+    west_w: float = 0.0
+    if team_features is not None and not team_features.empty and "w" in team_features.columns:
+        east_w = float(team_features["w"].get(east_rep["abbrev"], 0.0))
+        west_w = float(team_features["w"].get(west_rep["abbrev"], 0.0))
+    if east_w != west_w:
+        hi, lo = (east_rep, west_rep) if east_w >= west_w else (west_rep, east_rep)
     else:
-        hi, lo = west_rep, east_rep
+        # Fallback: higher R4 advancement probability
+        hi, lo = (east_rep, west_rep) if east_rep["adv_prob"] >= west_rep["adv_prob"] else (west_rep, east_rep)
 
     if team_features is not None and spec is not None:
         p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)

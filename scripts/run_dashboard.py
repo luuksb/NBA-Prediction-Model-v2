@@ -17,6 +17,7 @@ from pathlib import Path
 # Add repo root so src/dashboard imports resolve
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import json
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -47,6 +48,13 @@ st.set_page_config(
 
 cfg = load_dashboard_config()
 COLORS = cfg["ui"]["colors"]
+
+with open(cfg["paths"]["training_windows_config"]) as _f:
+    _tw_cfg = yaml.safe_load(_f)
+_WINDOW_SPANS: dict[str, str] = {
+    w["name"]: f"{w['start_year']}–{w['end_year']}"
+    for w in _tw_cfg["windows"]
+}
 
 # ---------------------------------------------------------------------------
 # NBA team colors  (primary, secondary, tertiary)
@@ -859,11 +867,38 @@ def _render_champ_prob_chart_html(
 
 
 @st.cache_data
+def _load_actual_champions(playoff_series_dir: str) -> dict[int, str]:
+    """Return a dict mapping year -> actual champion abbreviation.
+
+    Reads the raw per-year playoff series CSVs which carry explicit team_high /
+    team_low columns.  Years with more than one finals row are resolved via a
+    small hardcoded override for the early-era data quality issues (1980-1983).
+    """
+    # Hardcoded for 1980-1983 where the raw data has multiple finals rows
+    _overrides: dict[int, str] = {1980: "LAL", 1981: "BOS", 1982: "LAL", 1983: "PHI"}
+
+    champions: dict[int, str] = dict(_overrides)
+    series_path = Path(playoff_series_dir)
+    for csv_file in sorted(series_path.glob("*_nba_api.csv")):
+        df = pd.read_csv(csv_file)
+        year = int(df["season"].iloc[0])
+        if year in _overrides:
+            continue
+        finals = df[df["round"] == "finals"]
+        if len(finals) != 1:
+            continue
+        row = finals.iloc[0]
+        champions[year] = row["team_high"] if int(row["higher_seed_wins"]) == 1 else row["team_low"]
+    return champions
+
+
+@st.cache_data
 def _compute_model_performance(
     window: str,
     features: tuple[str, ...],
     series_dataset_path: str,
     training_windows_config: str,
+    results_dir: str = "results/simulations",
 ) -> dict:
     """Fit logistic regression for the given window and return performance metrics.
 
@@ -909,12 +944,40 @@ def _compute_model_performance(
         for feat in features
     ]
 
+    preds = (probs >= 0.5).astype(int)
+    correct_series = int((preds == y_arr).sum())
+    total_series = len(y_arr)
+
+    actual_champions = _load_actual_champions(cfg["paths"]["playoff_series_dir"])
+
+    # Compare simulated predicted_champion vs actual champion for each in-window year.
+    sim_path = Path(results_dir)
+    correct_champs = 0
+    total_champs = 0
+    for yr in range(start_year, end_year + 1):
+        summary_path = sim_path / f"{yr}_{window}" / "summary.json"
+        if not summary_path.exists():
+            continue
+        with open(summary_path) as _f:
+            sim_summary = json.load(_f)
+        predicted = sim_summary.get("predicted_champion")
+        actual = actual_champions.get(yr)
+        if not predicted or actual is None:
+            continue
+        total_champs += 1
+        if predicted == actual:
+            correct_champs += 1
+
     return {
         "pseudo_r2": float(result.prsquared),
         "auc": auc,
         "brier": brier,
         "n_obs": len(sub),
         "feat_stats": feat_stats,
+        "correct_series": correct_series,
+        "total_series": total_series,
+        "correct_champs": correct_champs,
+        "total_champs": total_champs,
     }
 
 
@@ -938,7 +1001,12 @@ with panel_col:
     st.markdown('<div style="height:0.7rem"></div>', unsafe_allow_html=True)
     st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Configuration</h1>', unsafe_allow_html=True)
     selected_year = st.selectbox("Year", _years, index=0)
-    selected_window = st.selectbox("Window", _windows, index=0)
+    selected_window = st.selectbox(
+        "Window",
+        _windows,
+        index=0,
+        format_func=lambda w: f"{w} ({_WINDOW_SPANS.get(w, '')})" if _WINDOW_SPANS.get(w) else w,
+    )
     selected_run = f"{selected_year}_{selected_window}"
     if selected_run not in available_runs:
         st.error(f"No results for {selected_year} / {selected_window}.")
@@ -959,6 +1027,25 @@ try:
 except FileNotFoundError:
     spec = None
 
+_insample_all: list[dict] = []
+for _w in ["full", "modern", "recent"]:
+    try:
+        _w_spec = load_model_spec(_w)
+    except FileNotFoundError:
+        continue
+    _w_perf = _compute_model_performance(
+        _w,
+        tuple(_w_spec["features"]),
+        cfg["paths"]["series_dataset_path"],
+        cfg["paths"]["training_windows_config"],
+        cfg["paths"]["results_dir"],
+    )
+    _insample_all.append({
+        "window": _w,
+        "span": _WINDOW_SPANS.get(_w, ""),
+        **_w_perf,
+    })
+
 _item_style = (
     "display:block;width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;"
     "border-radius:3px;padding:2px 6px;font-family:monospace;"
@@ -966,10 +1053,11 @@ _item_style = (
 )
 
 with panel_col:
-    st.markdown("---")
-    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Specification</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="font-size:1.6rem;margin:0rem 0 1rem 0">Model Specification</h1>', unsafe_allow_html=True)
     if spec is not None:
-        st.markdown(f"**Training window:** {spec['window']}")
+        _span = _WINDOW_SPANS.get(spec["window"], "")
+        _span_str = f" ({_span})" if _span else ""
+        st.markdown(f"**Training window:** {spec['window']}{_span_str}")
         st.markdown(f"**Observations (N):** {spec['n_obs']}")
         st.markdown("**Features:**")
         pills_html = "".join(
@@ -983,7 +1071,7 @@ with panel_col:
 
     # ── Model performance ─────────────────────────────────────────────────
     if spec is not None:
-        st.markdown("---")
+        st.markdown('<hr style="margin:0.5rem 0;border-color:#333">', unsafe_allow_html=True)
         st.markdown('<h1 style="font-size:1.6rem;margin:0 0 1rem 0">Model Performance</h1>', unsafe_allow_html=True)
         series_ds_path = cfg["paths"]["series_dataset_path"]
         tw_config_path = cfg["paths"]["training_windows_config"]
@@ -1029,19 +1117,51 @@ with panel_col:
         )
         st.markdown(perf_block, unsafe_allow_html=True)
 
+        if _insample_all:
+            st.markdown('<hr style="margin:0.5rem 0;border-color:#333">', unsafe_allow_html=True)
+            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">In-Sample Fit</h1>', unsafe_allow_html=True)
+            rows_html = ""
+            for _r in _insample_all:
+                cs, ts = _r["correct_series"], _r["total_series"]
+                cc, tc = _r["correct_champs"], _r["total_champs"]
+                champ_pct = f"({cc/tc:.0%})" if tc > 0 else "(—)"
+                rows_html += (
+                    f'<tr>'
+                    f'<td style="padding:3px 6px;color:#ccc;font-size:10px;white-space:nowrap">'
+                    f'{_r["window"].capitalize()} ({_r["span"]})</td>'
+                    f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{cs}/{ts}</td>'
+                    f'<td style="padding:3px 6px;color:#90a4ae;font-size:10px">({cs/ts:.0%})</td>'
+                    f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{cc}/{tc}</td>'
+                    f'<td style="padding:3px 6px;color:#90a4ae;font-size:10px">{champ_pct}</td>'
+                    f'</tr>'
+                )
+            st.markdown(
+                f'<table style="width:100%;border-collapse:collapse;background:#1a1a1a;border-radius:4px">'
+                f'<thead><tr style="background:#222">'
+                f'<th style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Window</th>'
+                f'<th colspan="2" style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Series</th>'
+                f'<th colspan="2" style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Championships</th>'
+                f'</tr></thead>'
+                f'<tbody>{rows_html}</tbody>'
+                f'</table>',
+                unsafe_allow_html=True,
+            )
+
 # ---------------------------------------------------------------------------
 # Main content
 # ---------------------------------------------------------------------------
 with main_col:
     st.markdown('<h1 style="margin-top:0rem;margin-bottom:0.8rem">NBA Playoff Prediction Model</h1>', unsafe_allow_html=True)
-    st.caption("Monte Carlo bracket simulation — 50,000 iterations")
+    st.caption("Monte Carlo bracket simulation")
 
+    n_sims = summary.get("n_sims", 0)
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Year", str(year))
     c2.metric("Window", window.capitalize())
+    _actual_champs_lookup = _load_actual_champions(cfg["paths"]["playoff_series_dir"])
+    _actual_champ = summary.get("actual_champion") or _actual_champs_lookup.get(year) or "TBD"
     c3.metric("Predicted Champion", summary.get("predicted_champion") or "—")
-    c4.metric("Actual Champion", summary.get("actual_champion") or "TBD")
-    n_sims = summary.get("n_sims", 0)
+    c4.metric("Actual Champion", _actual_champ)
     c5.metric("Simulations", f"{n_sims // 1000}k" if n_sims >= 1000 else str(n_sims))
 
     st.divider()
