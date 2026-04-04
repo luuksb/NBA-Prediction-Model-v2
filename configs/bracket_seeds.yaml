@@ -1,6 +1,6 @@
 # Bracket seeding configuration
 # For each year listed here, seeds take precedence over the playoff_series CSV.
-# Historical years (1980–2024) are loaded automatically from data/raw/playoff_series/.
+# Historical years (1980-2024) are loaded automatically from data/raw/playoff_series/.
 # Add out-of-sample years here manually once seedings are known.
 #
 # Format:
@@ -12,13 +12,248 @@
 # Team abbreviations must match those in data/raw/*.csv (e.g. BOS, NYK, MIL).
 
 bracket_seeds:
+
+  1986:
+    # East: BOS 1, MIL 2, PHI 3, ATL 4, DET 5, WSB 6, NJN 7, CHI 8
+    east: [BOS, MIL, PHI, ATL, DET, WSB, NJN, CHI]
+    # West: LAL 1, HOU 2, DEN 3, DAL 4, UTA 5, POR 6, SAC 7, SAS 8
+    west: [LAL, HOU, DEN, DAL, UTA, POR, SAC, SAS]
+
+  1987:
+    # East: BOS 1, ATL 2, DET 3, MIL 4, PHI 5, WSB 6, IND 7, CHI 8
+    east: [BOS, ATL, DET, MIL, PHI, WSB, IND, CHI]
+    # West: LAL 1, DAL 2, POR 3, UTA 4, HOU 5, GSW 6, SEA 7, DEN 8
+    west: [LAL, DAL, POR, UTA, HOU, GSW, SEA, DEN]
+
+  1988:
+    # East: BOS 1, DET 2, ATL 3, CHI 4, CLE 5, MIL 6, NYK 7, IND 8
+    east: [BOS, DET, ATL, CHI, CLE, MIL, NYK, IND]
+    # West: LAL 1, DEN 2, DAL 3, POR 4, UTA 5, HOU 6, SEA 7, SAS 8
+    west: [LAL, DEN, DAL, POR, UTA, HOU, SEA, SAS]
+
+  1989:
+    # East: DET 1, NYK 2, CLE 3, ATL 4, MIL 5, CHI 6, PHI 7, BOS 8
+    east: [DET, NYK, CLE, ATL, MIL, CHI, PHI, BOS]
+    # West: LAL 1, UTA 2, PHO 3, SEA 4, HOU 5, DEN 6, GSW 7, POR 8
+    west: [LAL, UTA, PHO, SEA, HOU, DEN, GSW, POR]
+
+  1990:
+    # East: DET 1, PHI 2, CHI 3, BOS 4, NYK 5, MIL 6, CLE 7, IND 8
+    east: [DET, PHI, CHI, BOS, NYK, MIL, CLE, IND]
+    # West: LAL 1, SAS 2, POR 3, UTA 4, PHO 5, DAL 6, DEN 7, HOU 8
+    west: [LAL, SAS, POR, UTA, PHO, DAL, DEN, HOU]
+
+  1991:
+    # East: CHI 1, BOS 2, DET 3, MIL 4, PHI 5, ATL 6, IND 7, NYK 8
+    east: [CHI, BOS, DET, MIL, PHI, ATL, IND, NYK]
+    # West: POR 1, SAS 2, LAL 3, PHO 4, UTA 5, HOU 6, GSW 7, SEA 8
+    west: [POR, SAS, LAL, PHO, UTA, HOU, GSW, SEA]
+
+  1992:
+    # East: CHI 1, BOS 2, NYK 3, CLE 4, DET 5, IND 6, NJN 7, ATL 8
+    east: [CHI, BOS, NYK, CLE, DET, IND, NJN, ATL]
+    # West: POR 1, GSW 2, UTA 3, PHO 4, SAS 5, SEA 6, LAC 7, LAL 8
+    west: [POR, GSW, UTA, PHO, SAS, SEA, LAC, LAL]
+
+  1993:
+    # East: NYK 1, CHI 2, CLE 3, BOS 4, CHH 5, NJN 6, ATL 7, IND 8
+    east: [NYK, CHI, CLE, BOS, CHH, NJN, ATL, IND]
+    # West: PHO 1, SEA 2, HOU 3, POR 4, SAS 5, UTA 6, LAC 7, LAL 8
+    west: [PHO, SEA, HOU, POR, SAS, UTA, LAC, LAL]
+
+  1994:
+    # East: ATL 1, NYK 2, CHI 3, ORL 4, CLE 5, IND 6, NJN 7, MIA 8
+    east: [ATL, NYK, CHI, ORL, CLE, IND, NJN, MIA]
+    # West: SEA 1, HOU 2, PHO 3, SAS 4, UTA 5, GSW 6, POR 7, DEN 8
+    west: [SEA, HOU, PHO, SAS, UTA, GSW, POR, DEN]
+
+  1995:
+    # East: ORL 1, IND 2, NYK 3, CHH 4, CHI 5, CLE 6, ATL 7, BOS 8
+    east: [ORL, IND, NYK, CHH, CHI, CLE, ATL, BOS]
+    # West: SAS 1, PHO 2, UTA 3, SEA 4, LAL 5, HOU 6, POR 7, DEN 8
+    west: [SAS, PHO, UTA, SEA, LAL, HOU, POR, DEN]
+
+  1996:
+    # East: CHI 1, ORL 2, IND 3, NYK 4, CLE 5, ATL 6, DET 7, MIA 8
+    east: [CHI, ORL, IND, NYK, CLE, ATL, DET, MIA]
+    # West: SEA 1, SAS 2, UTA 3, LAL 4, HOU 5, POR 6, PHO 7, SAC 8
+    west: [SEA, SAS, UTA, LAL, HOU, POR, PHO, SAC]
+
+  1997:
+    # East: CHI 1, MIA 2, NYK 3, ATL 4, DET 5, CHH 6, ORL 7, WSB 8
+    east: [CHI, MIA, NYK, ATL, DET, CHH, ORL, WSB]
+    # West: UTA 1, HOU 2, SEA 3, LAL 4, POR 5, MIN 6, PHO 7, LAC 8
+    west: [UTA, HOU, SEA, LAL, POR, MIN, PHO, LAC]
+
+  1998:
+    # East: CHI 1, MIA 2, IND 3, CHH 4, ATL 5, CLE 6, NYK 7, NJN 8
+    east: [CHI, MIA, IND, CHH, ATL, CLE, NYK, NJN]
+    # West: UTA 1, SEA 2, LAL 3, SAS 4, PHO 5, POR 6, MIN 7, HOU 8
+    west: [UTA, SEA, LAL, SAS, PHO, POR, MIN, HOU]
+
+  1999:
+    # East: MIA 1, ORL 2, IND 3, ATL 4, DET 5, MIL 6, PHI 7, NYK 8
+    east: [MIA, ORL, IND, ATL, DET, MIL, PHI, NYK]
+    # West: SAS 1, UTA 2, POR 3, HOU 4, LAL 5, PHO 6, SAC 7, MIN 8
+    west: [SAS, UTA, POR, HOU, LAL, PHO, SAC, MIN]
+
+  2000:
+    # East: IND 1, MIA 2, NYK 3, PHI 4, CHH 5, TOR 6, MIL 7, DET 8
+    east: [IND, MIA, NYK, PHI, CHH, TOR, MIL, DET]
+    # West: LAL 1, UTA 2, POR 3, PHO 4, SAS 5, MIN 6, SEA 7, SAC 8
+    west: [LAL, UTA, POR, PHO, SAS, MIN, SEA, SAC]
+
+  2001:
+    # East: PHI 1, MIL 2, MIA 3, NYK 4, TOR 5, CHH 6, ORL 7, IND 8
+    east: [PHI, MIL, MIA, NYK, TOR, CHH, ORL, IND]
+    # West: SAS 1, LAL 2, SAC 3, DAL 4, UTA 5, PHO 6, POR 7, MIN 8
+    west: [SAS, LAL, SAC, DAL, UTA, PHO, POR, MIN]
+
+  2002:
+    # East: NJN 1, DET 2, BOS 3, CHH 4, ORL 5, PHI 6, TOR 7, IND 8
+    east: [NJN, DET, BOS, CHH, ORL, PHI, TOR, IND]
+    # West: SAC 1, SAS 2, LAL 3, DAL 4, MIN 5, POR 6, SEA 7, UTA 8
+    west: [SAC, SAS, LAL, DAL, MIN, POR, SEA, UTA]
+
+  2003:
+    # East: DET 1, NJN 2, IND 3, PHI 4, NOH 5, BOS 6, MIL 7, ORL 8
+    east: [DET, NJN, IND, PHI, NOH, BOS, MIL, ORL]
+    # West: SAS 1, SAC 2, DAL 3, MIN 4, LAL 5, POR 6, UTA 7, PHO 8
+    west: [SAS, SAC, DAL, MIN, LAL, POR, UTA, PHO]
+
+  2004:
+    # East: IND 1, NJN 2, DET 3, MIA 4, NOH 5, MIL 6, NYK 7, BOS 8
+    east: [IND, NJN, DET, MIA, NOH, MIL, NYK, BOS]
+    # West: MIN 1, LAL 2, SAS 3, SAC 4, DAL 5, MEM 6, HOU 7, DEN 8
+    west: [MIN, LAL, SAS, SAC, DAL, MEM, HOU, DEN]
+
+  2005:
+    # East: MIA 1, DET 2, CHI 3, BOS 4, WAS 5, IND 6, PHI 7, NJN 8
+    east: [MIA, DET, CHI, BOS, WAS, IND, PHI, NJN]
+    # West: PHO 1, SAS 2, DAL 3, SEA 4, HOU 5, SAC 6, DEN 7, MEM 8
+    west: [PHO, SAS, DAL, SEA, HOU, SAC, DEN, MEM]
+
+  2006:
+    # East: DET 1, MIA 2, CLE 3, NJN 4, WAS 5, IND 6, CHI 7, MIL 8
+    east: [DET, MIA, CLE, NJN, WAS, IND, CHI, MIL]
+    # West: SAS 1, DAL 2, PHO 3, DEN 4, MEM 5, LAC 6, LAL 7, SAC 8
+    west: [SAS, DAL, PHO, DEN, MEM, LAC, LAL, SAC]
+
+  2007:
+    # East: DET 1, CLE 2, TOR 3, MIA 4, CHI 5, NJN 6, WAS 7, ORL 8
+    east: [DET, CLE, TOR, MIA, CHI, NJN, WAS, ORL]
+    # West: DAL 1, PHO 2, SAS 3, UTA 4, HOU 5, DEN 6, LAL 7, GSW 8
+    west: [DAL, PHO, SAS, UTA, HOU, DEN, LAL, GSW]
+
+  2008:
+    # East: BOS 1, DET 2, ORL 3, CLE 4, WAS 5, TOR 6, PHI 7, ATL 8
+    east: [BOS, DET, ORL, CLE, WAS, TOR, PHI, ATL]
+    # West: LAL 1, NOH 2, SAS 3, UTA 4, HOU 5, PHO 6, DAL 7, DEN 8
+    west: [LAL, NOH, SAS, UTA, HOU, PHO, DAL, DEN]
+
+  2009:
+    # East: CLE 1, BOS 2, ORL 3, ATL 4, MIA 5, PHI 6, CHI 7, DET 8
+    east: [CLE, BOS, ORL, ATL, MIA, PHI, CHI, DET]
+    # West: LAL 1, DEN 2, SAS 3, POR 4, HOU 5, DAL 6, NOH 7, UTA 8
+    west: [LAL, DEN, SAS, POR, HOU, DAL, NOH, UTA]
+
+  2010:
+    # East: CLE 1, ORL 2, ATL 3, BOS 4, MIA 5, MIL 6, CHA 7, CHI 8
+    east: [CLE, ORL, ATL, BOS, MIA, MIL, CHA, CHI]
+    # West: LAL 1, DAL 2, PHO 3, DEN 4, UTA 5, POR 6, SAS 7, OKC 8
+    west: [LAL, DAL, PHO, DEN, UTA, POR, SAS, OKC]
+
+  2011:
+    # East: CHI 1, MIA 2, BOS 3, ORL 4, ATL 5, NYK 6, PHI 7, IND 8
+    east: [CHI, MIA, BOS, ORL, ATL, NYK, PHI, IND]
+    # West: SAS 1, LAL 2, DAL 3, OKC 4, DEN 5, POR 6, NOH 7, MEM 8
+    west: [SAS, LAL, DAL, OKC, DEN, POR, NOH, MEM]
+
+  2012:
+    # East: CHI 1, MIA 2, IND 3, BOS 4, ATL 5, ORL 6, NYK 7, PHI 8
+    east: [CHI, MIA, IND, BOS, ATL, ORL, NYK, PHI]
+    # West: SAS 1, OKC 2, LAL 3, MEM 4, LAC 5, DEN 6, DAL 7, UTA 8
+    west: [SAS, OKC, LAL, MEM, LAC, DEN, DAL, UTA]
+
+  2013:
+    # East: MIA 1, NYK 2, IND 3, BRK 4, CHI 5, ATL 6, BOS 7, MIL 8
+    east: [MIA, NYK, IND, BRK, CHI, ATL, BOS, MIL]
+    # West: OKC 1, SAS 2, DEN 3, LAC 4, MEM 5, GSW 6, LAL 7, HOU 8
+    west: [OKC, SAS, DEN, LAC, MEM, GSW, LAL, HOU]
+
+  2014:
+    # East: IND 1, MIA 2, TOR 3, CHI 4, WAS 5, BRK 6, CHA 7, ATL 8
+    east: [IND, MIA, TOR, CHI, WAS, BRK, CHA, ATL]
+    # West: SAS 1, OKC 2, LAC 3, HOU 4, POR 5, GSW 6, MEM 7, DAL 8
+    west: [SAS, OKC, LAC, HOU, POR, GSW, MEM, DAL]
+
+  2015:
+    # East: ATL 1, CLE 2, CHI 3, TOR 4, WAS 5, MIL 6, BOS 7, BRK 8
+    east: [ATL, CLE, CHI, TOR, WAS, MIL, BOS, BRK]
+    # West: GSW 1, HOU 2, LAC 3, POR 4, MEM 5, SAS 6, DAL 7, NOP 8
+    west: [GSW, HOU, LAC, POR, MEM, SAS, DAL, NOP]
+
+  2016:
+    # East: CLE 1, TOR 2, MIA 3, ATL 4, BOS 5, CHO 6, IND 7, DET 8
+    east: [CLE, TOR, MIA, ATL, BOS, CHO, IND, DET]
+    # West: GSW 1, SAS 2, OKC 3, LAC 4, POR 5, DAL 6, MEM 7, HOU 8
+    west: [GSW, SAS, OKC, LAC, POR, DAL, MEM, HOU]
+
+  2017:
+    # East: BOS 1, CLE 2, TOR 3, WAS 4, ATL 5, MIL 6, IND 7, CHI 8
+    east: [BOS, CLE, TOR, WAS, ATL, MIL, IND, CHI]
+    # West: GSW 1, SAS 2, HOU 3, LAC 4, UTA 5, OKC 6, MEM 7, POR 8
+    west: [GSW, SAS, HOU, LAC, UTA, OKC, MEM, POR]
+
+  2018:
+    # East: TOR 1, BOS 2, PHI 3, CLE 4, IND 5, MIA 6, MIL 7, WAS 8
+    east: [TOR, BOS, PHI, CLE, IND, MIA, MIL, WAS]
+    # West: HOU 1, GSW 2, POR 3, OKC 4, UTA 5, NOP 6, SAS 7, MIN 8
+    west: [HOU, GSW, POR, OKC, UTA, NOP, SAS, MIN]
+
+  2019:
+    # East: MIL 1, TOR 2, PHI 3, BOS 4, IND 5, BRK 6, ORL 7, DET 8
+    east: [MIL, TOR, PHI, BOS, IND, BRK, ORL, DET]
+    # West: GSW 1, DEN 2, POR 3, HOU 4, UTA 5, OKC 6, SAS 7, LAC 8
+    west: [GSW, DEN, POR, HOU, UTA, OKC, SAS, LAC]
+
+  2020:
+    # East: MIL 1, TOR 2, BOS 3, IND 4, MIA 5, PHI 6, BRK 7, ORL 8
+    east: [MIL, TOR, BOS, IND, MIA, PHI, BRK, ORL]
+    # West: LAL 1, LAC 2, DEN 3, HOU 4, OKC 5, UTA 6, DAL 7, POR 8
+    west: [LAL, LAC, DEN, HOU, OKC, UTA, DAL, POR]
+
+  2021:
+    # East: PHI 1, BRK 2, MIL 3, NYK 4, ATL 5, MIA 6, BOS 7, WAS 8
+    east: [PHI, BRK, MIL, NYK, ATL, MIA, BOS, WAS]
+    # West: UTA 1, PHO 2, DEN 3, LAC 4, DAL 5, POR 6, LAL 7, MEM 8
+    west: [UTA, PHO, DEN, LAC, DAL, POR, LAL, MEM]
+
+  2022:
+    # East: MIA 1, BOS 2, MIL 3, PHI 4, TOR 5, CHI 6, BRK 7, CLE 8
+    east: [MIA, BOS, MIL, PHI, TOR, CHI, BRK, CLE]
+    # West: PHO 1, MEM 2, GSW 3, DAL 4, UTA 5, DEN 6, MIN 7, LAC 8
+    west: [PHO, MEM, GSW, DAL, UTA, DEN, MIN, LAC]
+
+  2023:
+    # East: MIL 1, BOS 2, PHI 3, CLE 4, NYK 5, BRK 6, MIA 7, ATL 8
+    east: [MIL, BOS, PHI, CLE, NYK, BRK, MIA, ATL]
+    # West: DEN 1, MEM 2, SAC 3, PHO 4, LAC 5, GSW 6, LAL 7, MIN 8
+    west: [DEN, MEM, SAC, PHO, LAC, GSW, LAL, MIN]
+
+  2024:
+    # East: BOS 1, NYK 2, MIL 3, CLE 4, ORL 5, IND 6, PHI 7, MIA 8
+    east: [BOS, NYK, MIL, CLE, ORL, IND, PHI, MIA]
+    # West: OKC 1, DEN 2, MIN 3, LAC 4, DAL 5, PHO 6, NOP 7, LAL 8
+    west: [OKC, DEN, MIN, LAC, DAL, PHO, NOP, LAL]
+
   2025:
     # East: CLE 1, BOS 2, NYK 3, IND 4, MIL 5, DET 6, ORL 7, MIA 8
     east: [CLE, BOS, NYK, IND, MIL, DET, ORL, MIA]
     # West: OKC 1, HOU 2, LAL 3, DEN 4, LAC 5, MIN 6, GSW 7, MEM 8
     west: [OKC, HOU, LAL, DEN, LAC, MIN, GSW, MEM]
 
-  # 2026 seedings — fill in once playoff bracket is set
+  # 2026 seedings -- fill in once playoff bracket is set
   # 2026:
   #   east: [BOS, CLE, NYK, MIL, ORL, IND, MIA, CHI]
   #   west: [OKC, HOU, MIN, LAL, GSW, DEN, SAC, MEM]
