@@ -100,14 +100,15 @@ _GLOBAL_CSS = f"""
 <style>
   /* ── Page background ─────────────────────────────────────────────────── */
   .stApp {{ background-color: {COLORS['background']}; }}
-  section[data-testid="stSidebar"] {{ background-color: #0d1f33; }}
+  section[data-testid="stSidebar"] {{ background-color: #121b2e; }}
 
   /* ── Left panel column ───────────────────────────────────────────────── */
   div[data-testid="stColumn"]:first-child {{
     position: relative !important;
-    background-color: #0d2438 !important;
-    border-radius: 8px !important;
-    padding: 8px !important;
+    background-color: #1e2a45 !important;
+    border-radius: 14px !important;
+    padding: 12px 10px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
   }}
 
   /* ── Bracket root container ──────────────────────────────────────────── */
@@ -123,7 +124,7 @@ _GLOBAL_CSS = f"""
     overflow-x: auto;
     box-sizing: border-box;
     background: {COLORS['background']};
-    border-radius: 8px;
+    border-radius: 14px;
   }}
 
   /* ── Conference blocks ───────────────────────────────────────────────── */
@@ -194,7 +195,7 @@ _GLOBAL_CSS = f"""
   .round-label {{
     font-size: 9px;
     font-weight: 600;
-    color: #607d8b;
+    color: #8fa3c1;
     text-align: center;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -259,19 +260,20 @@ _GLOBAL_CSS = f"""
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    background: #0d1520;
-    border: 1px solid #1e2d3d;
-    border-radius: 4px;
+    background: #1e2a45;
+    border: none;
+    border-radius: 8px;
     min-height: 36px;
     position: relative;
     box-sizing: border-box;
     width: 100%;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   }}
-  .team-node:hover {{ border-color: #4a7aaa; }}
+  .team-node:hover {{ box-shadow: 0 2px 12px rgba(90,180,255,0.22); }}
   .team-node.champion {{
-    border-color: {COLORS['champion_border']};
-    box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+    box-shadow: 0 0 12px 3px rgba(255,215,0,0.32);
+    outline: 1px solid {COLORS['champion_border']};
   }}
 
   /* ── Colored pill (left section, primary team color) ─────────────────── */
@@ -334,14 +336,14 @@ _GLOBAL_CSS = f"""
     justify-content: center;
     font-size: 7px;
     font-weight: 700;
-    color: #8a9ab0;
+    color: #8fa3c1;
   }}
 
   /* ── Win probability ─────────────────────────────────────────────────── */
   .team-prob {{
     font-size: 10px;
     font-weight: 700;
-    color: #8aadcc;
+    color: #8fa3c1;
     white-space: nowrap;
     flex-shrink: 0;
     align-self: center;
@@ -362,7 +364,7 @@ _GLOBAL_CSS = f"""
     top: 24%;
     height: 52%;
     width: 0;
-    border-right: 1.5px solid rgba(255,255,255,0.85);
+    border-right: 1.5px solid rgba(90,150,220,0.45);
   }}
   .conf-block.east .round-col-body .matchup::after {{
     content: '';
@@ -371,7 +373,7 @@ _GLOBAL_CSS = f"""
     top: 24%;
     height: 52%;
     width: 0;
-    border-left: 1.5px solid rgba(255,255,255,0.85);
+    border-left: 1.5px solid rgba(90,150,220,0.45);
   }}
   /* Step 2 — pair arm: vertical bar on .matchup-pair spanning 25%–75% of its height,
      connecting the midpoints of the two matchups inside it (the "gather" bar). */
@@ -382,7 +384,7 @@ _GLOBAL_CSS = f"""
     top: 25%;
     height: 50%;
     width: 0;
-    border-right: 1.5px solid rgba(255,255,255,0.85);
+    border-right: 1.5px solid rgba(90,150,220,0.45);
   }}
   .conf-block.east .matchup-pair::after {{
     content: '';
@@ -391,7 +393,7 @@ _GLOBAL_CSS = f"""
     top: 25%;
     height: 50%;
     width: 0;
-    border-left: 1.5px solid rgba(255,255,255,0.85);
+    border-left: 1.5px solid rgba(90,150,220,0.45);
   }}
   /* Step 3 — bridge: horizontal line from the pair arm's midpoint (top: 50%) to the
      next round's matchup. Width covers the column gap; card backgrounds hide any overlap.
@@ -407,7 +409,7 @@ _GLOBAL_CSS = f"""
     transform: translateY(-50%);
     width: 25px;
     height: 1.5px;
-    background: rgba(255,255,255,0.85);
+    background: rgba(90,150,220,0.45);
   }}
   .conf-block.west .r3 .matchup::before {{
     content: '';
@@ -417,7 +419,7 @@ _GLOBAL_CSS = f"""
     transform: translateY(-50%);
     width: 13px;
     height: 1.5px;
-    background: rgba(255,255,255,0.85);
+    background: rgba(90,150,220,0.45);
   }}
   .conf-block.east .r1 .matchup-pair::before {{
     content: '';
@@ -427,7 +429,7 @@ _GLOBAL_CSS = f"""
     transform: translateY(-50%);
     width: 25px;
     height: 1.5px;
-    background: rgba(255,255,255,0.85);
+    background: rgba(90,150,220,0.45);
   }}
   .conf-block.east .r3 .matchup::before {{
     content: '';
@@ -437,16 +439,89 @@ _GLOBAL_CSS = f"""
     transform: translateY(-50%);
     width: 13px;
     height: 1.5px;
-    background: rgba(255,255,255,0.85);
+    background: rgba(90,150,220,0.45);
   }}
 
 /* ── Text visibility on dark background ──────────────────────────────── */
-  .stApp h1, .stApp h2, .stApp h3, .stApp h4 {{ color: #ffffff !important; }}
-  .stApp p {{ color: #e0e0e0 !important; }}
-  [data-testid="stMetricValue"] {{ color: #ffffff !important; }}
-  [data-testid="stMetricLabel"] > div {{ color: #90a4ae !important; }}
-  [data-testid="stMarkdownContainer"] p {{ color: #e0e0e0 !important; }}
-  .stCaption {{ color: #90a4ae !important; }}
+  .stApp {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
+  .stApp h1, .stApp h2, .stApp h3, .stApp h4 {{
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+  }}
+  .stApp p {{ color: #c8d6e8 !important; }}
+  [data-testid="stMetricValue"] {{ color: #ffffff !important; font-weight: 700 !important; }}
+  [data-testid="stMetricLabel"] > div {{ color: #8fa3c1 !important; font-size: 0.78rem !important; }}
+  [data-testid="stMarkdownContainer"] p {{ color: #c8d6e8 !important; }}
+  .stCaption {{ color: #8fa3c1 !important; }}
+
+  /* ── Streamlit divider ───────────────────────────────────────────────── */
+  hr {{ border-color: #2a3a54 !important; }}
+
+  /* ── Streamlit buttons (pill style, accent fill) ─────────────────────── */
+  .stButton > button {{
+    background-color: #253350 !important;
+    color: #e8f0fb !important;
+    border: 1px solid #2a3a54 !important;
+    border-radius: 20px !important;
+    padding: 6px 18px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.03em !important;
+    transition: background 0.15s, box-shadow 0.15s !important;
+  }}
+  .stButton > button:hover {{
+    background-color: #5ab4ff !important;
+    color: #0d1520 !important;
+    border-color: #5ab4ff !important;
+    box-shadow: 0 2px 10px rgba(90,180,255,0.3) !important;
+  }}
+
+  /* ── Streamlit radio buttons ─────────────────────────────────────────── */
+  [data-testid="stRadio"] > div > label {{
+    color: #c8d6e8 !important;
+  }}
+  [data-testid="stRadio"] > div > label[data-baseweb="radio"] span:first-child {{
+    background-color: #1e2a45 !important;
+    border-color: #2a3a54 !important;
+  }}
+
+  /* ── Streamlit selectbox ─────────────────────────────────────────────── */
+  [data-testid="stSelectbox"] > div > div {{
+    background-color: #1e2a45 !important;
+    border: 1px solid #2a3a54 !important;
+    border-radius: 8px !important;
+    color: #e8f0fb !important;
+  }}
+  [data-testid="stSelectbox"] label {{
+    color: #8fa3c1 !important;
+    font-size: 0.82rem !important;
+  }}
+
+  /* ── Streamlit metric cards ──────────────────────────────────────────── */
+  [data-testid="stMetric"] {{
+    background-color: #1e2a45 !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  }}
+
+  /* ── Streamlit native table / dataframe ──────────────────────────────── */
+  [data-testid="stDataFrame"] thead tr th {{
+    background-color: #253350 !important;
+    color: #8fa3c1 !important;
+    font-weight: 600 !important;
+    border-bottom: 1px solid #2a3a54 !important;
+  }}
+  [data-testid="stDataFrame"] tbody tr:nth-child(even) td {{
+    background-color: #1e2a45 !important;
+  }}
+  [data-testid="stDataFrame"] tbody tr:nth-child(odd) td {{
+    background-color: #243050 !important;
+  }}
+  [data-testid="stDataFrame"] tbody tr td {{
+    color: #e8f0fb !important;
+    border: none !important;
+  }}
 
   /* ── Sidebar: always visible, no collapse arrow ───────────────────────── */
   [data-testid="stSidebarCollapseButton"],
@@ -664,7 +739,7 @@ def _render_bracket_html_canvas(
     _cf_cy  = cf_y     + _ACTUAL_H / 2
     _fin_cy = finals_y + _ACTUAL_H / 2
 
-    _S = 'stroke="#6b7280" stroke-width="1.5" fill="none" opacity="1"'
+    _S = 'stroke="#3d5a80" stroke-width="1.5" fill="none" opacity="0.85"'
 
     def _arm_right(src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float) -> str:
         """Bracket arm extending rightward: two stubs → vertical gather bar → bridge to dest."""
@@ -721,21 +796,22 @@ def _render_bracket_html_canvas(
     _css = f"""
       * {{ box-sizing: border-box; margin: 0; padding: 0; }}
       body {{ background: {COLORS['background']}; overflow-x: auto; overflow-y: hidden;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
       .matchup {{ display: flex; flex-direction: column; gap: 3px; width: 100%; }}
       .team-node {{
         display: flex; flex-direction: row; align-items: stretch;
-        background: #0d1520; border: 1px solid #1e2d3d; border-radius: 4px;
+        background: #1e2a45; border: none; border-radius: 8px;
         min-height: 36px; position: relative; width: 100%; overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
       }}
-      .team-node:hover {{ border-color: #4a7aaa; }}
+      .team-node:hover {{ box-shadow: 0 2px 12px rgba(90,180,255,0.22); }}
       .team-node.champion {{
-        border-color: {champ_border};
-        box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+        box-shadow: 0 0 12px 3px rgba(255,215,0,0.32);
+        outline: 1px solid {champ_border};
       }}
       .team-node.finalist {{
-        border-color: {champ_border};
-        box-shadow: 0 0 8px 2px rgba(255,215,0,0.28);
+        box-shadow: 0 0 12px 3px rgba(255,215,0,0.32);
+        outline: 1px solid {champ_border};
       }}
       .team-pill {{
         display: flex; flex-direction: row; align-items: center; flex: 1; min-width: 0;
@@ -758,10 +834,10 @@ def _render_bracket_html_canvas(
       .team-logo {{ width: 22px; height: 22px; object-fit: contain; }}
       .team-logo-fallback {{
         width: 22px; height: 22px; display: flex; align-items: center;
-        justify-content: center; font-size: 7px; font-weight: 700; color: #8a9ab0;
+        justify-content: center; font-size: 7px; font-weight: 700; color: #8fa3c1;
       }}
       .team-prob {{
-        font-size: 10px; font-weight: 700; color: #8aadcc; white-space: nowrap;
+        font-size: 10px; font-weight: 700; color: #8fa3c1; white-space: nowrap;
         flex-shrink: 0; align-self: center; padding: 0 5px; min-width: 28px;
         text-align: right;
       }}
@@ -834,29 +910,29 @@ def _render_champ_prob_chart_html(
     for _, row in sorted_df.iterrows():
         team = str(row["team"])
         prob = float(row["championship_prob"])
-        color = "#1D428A" if team in west_set else "#CE1141"
+        color = "#3a68b5" if team in west_set else "#c04060"
         bar_h = max(2, int(MAX_BAR_H * prob / max_prob))
         pct_label = f"{prob:.1%}" if prob < 0.005 else f"{prob:.0%}"
         url = logo_url(team)
 
         bar_cells += (
             f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
-            f'<span style="font-size:9px;color:#ccc;margin-bottom:2px;white-space:nowrap">{pct_label}</span>'
-            f'<div style="width:80%;height:{bar_h}px;background:{color};border-radius:2px 2px 0 0"></div>'
+            f'<span style="font-size:9px;color:#8fa3c1;margin-bottom:2px;white-space:nowrap">{pct_label}</span>'
+            f'<div style="width:80%;height:{bar_h}px;background:{color};border-radius:4px 4px 0 0"></div>'
             f'</div>'
         )
         logo_cells += (
             f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
             f'<img src="{url}" style="width:22px;height:22px;object-fit:contain" '
             f'onerror="this.style.visibility=\'hidden\'">'
-            f'<span style="font-size:8px;color:#777;margin-top:1px">{team}</span>'
+            f'<span style="font-size:8px;color:#8fa3c1;margin-top:1px">{team}</span>'
             f'</div>'
         )
 
     return (
         f'<div style="font-family:sans-serif;background:transparent;width:100%">'
         f'<div style="display:flex;align-items:flex-end;width:100%;height:{MAX_BAR_H + 22}px;'
-        f'border-bottom:1px solid #444">'
+        f'border-bottom:1px solid #2a3a54">'
         f'{bar_cells}'
         f'</div>'
         f'<div style="display:flex;width:100%;margin-top:4px">'
@@ -1047,13 +1123,14 @@ for _w in ["full", "modern", "recent"]:
     })
 
 _item_style = (
-    "display:block;width:100%;box-sizing:border-box;background:#1e1e1e;border:1px solid #333;"
-    "border-radius:3px;padding:2px 6px;font-family:monospace;"
-    "font-size:12px;color:#ffffff;margin:3px 0;"
+    "display:block;width:100%;box-sizing:border-box;background:#253350;border:none;"
+    "border-radius:8px;padding:3px 8px;font-family:monospace;"
+    "font-size:11px;color:#e8f0fb;margin:3px 0;"
+    "box-shadow:0 2px 6px rgba(0,0,0,0.3);"
 )
 
 with panel_col:
-    st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#444">', unsafe_allow_html=True)
+    st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
     st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Specification</h1>', unsafe_allow_html=True)
     if spec is not None:
         _span = _WINDOW_SPANS.get(spec["window"], "")
@@ -1072,7 +1149,7 @@ with panel_col:
 
     # ── Model performance ─────────────────────────────────────────────────
     if spec is not None:
-        st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#444">', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
         st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Performance</h1>', unsafe_allow_html=True)
         series_ds_path = cfg["paths"]["series_dataset_path"]
         tw_config_path = cfg["paths"]["training_windows_config"]
@@ -1087,12 +1164,12 @@ with panel_col:
         for fs in perf["feat_stats"]:
             sig = "***" if fs["p-value"] < 0.001 else ("**" if fs["p-value"] < 0.01 else ("*" if fs["p-value"] < 0.05 else "·"))
             feat_rows += (
-                f'<tr>'
-                f'<td style="padding:3px 6px;color:#ccc;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{fs["Feature"]}</td>'
-                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["Coef."]:+.4f}</td>'
-                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["z"]:.2f}</td>'
-                f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{fs["p-value"]:.4f}</td>'
-                f'<td style="padding:3px 6px;text-align:center;color:#ff9f40;font-size:10px">{sig}</td>'
+                f'<tr style="border-bottom:1px solid #1e2a45">'
+                f'<td style="padding:4px 6px;color:#8fa3c1;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{fs["Feature"]}</td>'
+                f'<td style="padding:4px 6px;text-align:right;color:#e8f0fb;font-size:10px">{fs["Coef."]:+.4f}</td>'
+                f'<td style="padding:4px 6px;text-align:right;color:#e8f0fb;font-size:10px">{fs["z"]:.2f}</td>'
+                f'<td style="padding:4px 6px;text-align:right;color:#e8f0fb;font-size:10px">{fs["p-value"]:.4f}</td>'
+                f'<td style="padding:4px 6px;text-align:center;color:#e84d4d;font-size:10px">{sig}</td>'
                 f'</tr>'
             )
         perf_block = (
@@ -1105,13 +1182,13 @@ with panel_col:
                 ]
             )
             + '<div style="height:0.5rem"></div>'
-            + '<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#1a1a1a;border-radius:4px;overflow:hidden">'
-            + '<thead><tr style="background:#222">'
-            + '<th style="width:42%;padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Feature</th>'
-            + '<th style="width:20%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">Coef.</th>'
-            + '<th style="width:12%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">z</th>'
-            + '<th style="width:18%;padding:4px 6px;text-align:right;color:#90a4ae;font-size:10px;font-weight:600">p</th>'
-            + '<th style="width:8%;padding:4px 6px;text-align:center;color:#90a4ae;font-size:10px;font-weight:600"></th>'
+            + '<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#1e2a45;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.3)">'
+            + '<thead><tr style="background:#253350;border-bottom:1px solid #2a3a54">'
+            + '<th style="width:42%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Feature</th>'
+            + '<th style="width:20%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Coef.</th>'
+            + '<th style="width:12%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">z</th>'
+            + '<th style="width:18%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">p</th>'
+            + '<th style="width:8%;padding:5px 6px;text-align:center;color:#8fa3c1;font-size:10px;font-weight:600"></th>'
             + '</tr></thead>'
             + f'<tbody>{feat_rows}</tbody>'
             + '</table>'
@@ -1119,7 +1196,7 @@ with panel_col:
         st.markdown(perf_block, unsafe_allow_html=True)
 
         if _insample_all:
-            st.markdown('<hr style="margin:0.5rem 0;border-color:#333">', unsafe_allow_html=True)
+            st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
             st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">In-Sample Fit</h1>', unsafe_allow_html=True)
             rows_html = ""
             for _r in _insample_all:
@@ -1127,21 +1204,23 @@ with panel_col:
                 cc, tc = _r["correct_champs"], _r["total_champs"]
                 champ_pct = f"({cc/tc:.0%})" if tc > 0 else "(—)"
                 rows_html += (
-                    f'<tr>'
-                    f'<td style="padding:3px 6px;color:#ccc;font-size:10px;white-space:nowrap">'
+                    f'<tr style="border-bottom:1px solid #1e2a45">'
+                    f'<td style="padding:4px 6px;color:#8fa3c1;font-size:10px;white-space:nowrap">'
                     f'{_r["window"].capitalize()} ({_r["span"]})</td>'
-                    f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{cs}/{ts}</td>'
-                    f'<td style="padding:3px 6px;color:#90a4ae;font-size:10px">({cs/ts:.0%})</td>'
-                    f'<td style="padding:3px 6px;text-align:right;color:#fff;font-size:10px">{cc}/{tc}</td>'
-                    f'<td style="padding:3px 6px;color:#90a4ae;font-size:10px">{champ_pct}</td>'
+                    f'<td style="padding:4px 6px;text-align:right;color:#e8f0fb;font-size:10px">{cs}/{ts}</td>'
+                    f'<td style="padding:4px 6px;color:#8fa3c1;font-size:10px">({cs/ts:.0%})</td>'
+                    f'<td style="padding:4px 6px;text-align:right;color:#e8f0fb;font-size:10px">{cc}/{tc}</td>'
+                    f'<td style="padding:4px 6px;color:#8fa3c1;font-size:10px">{champ_pct}</td>'
                     f'</tr>'
                 )
             st.markdown(
-                f'<table style="width:100%;border-collapse:collapse;background:#1a1a1a;border-radius:4px">'
-                f'<thead><tr style="background:#222">'
-                f'<th style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Window</th>'
-                f'<th colspan="2" style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Series</th>'
-                f'<th colspan="2" style="padding:4px 6px;text-align:left;color:#90a4ae;font-size:10px;font-weight:600">Championships</th>'
+                f'<table style="width:100%;table-layout:fixed;border-collapse:collapse;background:#1e2a45;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.3)">'
+                f'<thead><tr style="background:#253350;border-bottom:1px solid #2a3a54">'
+                f'<th style="width:36%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Window</th>'
+                f'<th style="width:16%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Series</th>'
+                f'<th style="width:12%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em"></th>'
+                f'<th style="width:24%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Championships</th>'
+                f'<th style="width:12%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em"></th>'
                 f'</tr></thead>'
                 f'<tbody>{rows_html}</tbody>'
                 f'</table>',
@@ -1152,8 +1231,11 @@ with panel_col:
 # Main content
 # ---------------------------------------------------------------------------
 with main_col:
-    st.markdown('<h1 style="margin-top:0rem;margin-bottom:0.8rem">NBA Playoff Prediction Model</h1>', unsafe_allow_html=True)
-    st.caption("Monte Carlo bracket simulation")
+    st.markdown(
+        '<h1 style="margin-top:0rem;margin-bottom:0.1rem">NBA Playoff Prediction Model</h1>'
+        '<p style="margin-top:0;margin-bottom:0.3rem;color:#8fa3c1;font-size:0.875rem">Monte Carlo bracket simulation</p>',
+        unsafe_allow_html=True,
+    )
 
     n_sims = summary.get("n_sims", 0)
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -1165,7 +1247,7 @@ with main_col:
     c4.metric("Actual Champion", _actual_champ)
     c5.metric("Simulations", f"{n_sims // 1000}k" if n_sims >= 1000 else str(n_sims))
 
-    st.divider()
+    st.markdown('<hr style="margin-top:2.3rem;margin-bottom:2rem;border-color:#2a3a54">', unsafe_allow_html=True)
 
     prob_mode = st.radio(
         "Probability Mode",
@@ -1220,7 +1302,7 @@ with main_col:
                 n_wins = int(round(prob * n_sims))
                 st.markdown(
                     f'<div style="margin-bottom:12px">'
-                    f'<div style="font-size:12px;color:#90a4ae;margin-bottom:1px">{row["team"]}</div>'
+                    f'<div style="font-size:12px;color:#8fa3c1;margin-bottom:1px">{row["team"]}</div>'
                     f'<div style="font-size:24px;font-weight:700;color:#ffffff;line-height:1.1">{prob:.3%}</div>'
                     f'<div style="font-size:11px;color:#ffffff;margin-top:2px">{n_wins} / {n_sims:,} sims</div>'
                     f'</div>',
