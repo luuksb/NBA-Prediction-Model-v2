@@ -1227,6 +1227,37 @@ with panel_col:
                 unsafe_allow_html=True,
             )
 
+    # ── Injury impact ──────────────────────────────────────────────────────
+    _iter_path = Path(cfg["paths"]["results_dir"]) / selected_run / "iterations.parquet"
+    if _iter_path.exists():
+        _iter_df = pd.read_parquet(_iter_path)
+        _inj_df = _iter_df.dropna(subset=["finalist_east_injuries", "finalist_west_injuries"]).copy()
+        if not _inj_df.empty:
+            _inj_df["_east_inj"] = _inj_df["finalist_east_injuries"].astype(int)
+            _inj_df["_west_inj"] = _inj_df["finalist_west_injuries"].astype(int)
+            _inj_df["_total_inj"] = _inj_df["_east_inj"] + _inj_df["_west_inj"]
+            _inj_df["_champ_is_east"] = _inj_df["champion"] == _inj_df["finalist_east"]
+            _inj_df["_champ_inj"] = _inj_df["_east_inj"].where(_inj_df["_champ_is_east"], _inj_df["_west_inj"])
+            _inj_df["_loser_inj"] = _inj_df["_west_inj"].where(_inj_df["_champ_is_east"], _inj_df["_east_inj"])
+
+            _pct_any = (_inj_df["_total_inj"] > 0).mean()
+            _one_sided = _inj_df[(_inj_df["_champ_inj"] == 0) != (_inj_df["_loser_inj"] == 0)]
+            _healthy_won = ((_one_sided["_champ_inj"] == 0) & (_one_sided["_loser_inj"] > 0)).sum()
+            _healthy_win_rate = _healthy_won / len(_one_sided) if len(_one_sided) > 0 else 0.0
+            _pct_inj_champ = (_inj_df["_champ_inj"] > 0).mean()
+
+            st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
+            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Injury Impact</h1>', unsafe_allow_html=True)
+            _inj_items = [
+                f"{_pct_any:.0%} of Finals have 1+ injured star",
+                f"Healthy finalist wins {_healthy_win_rate:.0%} of 1-sided injury matchups",
+                f"Champion overcame an injury in {_pct_inj_champ:.0%} of Finals",
+            ]
+            st.markdown(
+                "".join(f'<div style="{_item_style}">{item}</div>' for item in _inj_items),
+                unsafe_allow_html=True,
+            )
+
 # ---------------------------------------------------------------------------
 # Main content
 # ---------------------------------------------------------------------------
