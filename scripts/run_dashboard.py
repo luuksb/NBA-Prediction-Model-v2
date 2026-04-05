@@ -951,7 +951,7 @@ def _load_actual_champions(playoff_series_dir: str) -> dict[int, str]:
     small hardcoded override for the early-era data quality issues (1980-1983).
     """
     # Hardcoded for 1980-1983 where the raw data has multiple finals rows
-    _overrides: dict[int, str] = {1980: "LAL", 1981: "BOS", 1982: "LAL", 1983: "PHI"}
+    _overrides: dict[int, str] = {1980: "LAL", 1981: "BOS", 1982: "LAL", 1983: "PHI", 2025: "OKC"}
 
     champions: dict[int, str] = dict(_overrides)
     series_path = Path(playoff_series_dir)
@@ -1247,8 +1247,8 @@ with panel_col:
             _pct_inj_champ = (_inj_df["_champ_inj"] > 0).mean()
 
             st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
-            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.2rem 0">Simulated* Injury Impact</h1>', unsafe_allow_html=True)
-            st.markdown('<p style="font-size:0.78rem;color:#8fa3c1;margin:0 0 0.5rem 0">* only applicable to out-of-sample years (2025–2026).</p>', unsafe_allow_html=True)
+            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0rem 0">Injury Impact*</h1>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:0.78rem;color:#8fa3c1;margin:0 0 0.5rem 0">* Applicable only to out-of-sample (2025–2026)</p>', unsafe_allow_html=True)
             _inj_items = [
                 f"{_pct_any:.0%} of Finals have 1+ injured star",
                 f"Healthy finalist wins {_healthy_win_rate:.0%} of 1-sided injury matchups",
