@@ -533,6 +533,9 @@ _GLOBAL_CSS = f"""
   button[aria-label="Open sidebar"] {{
     display: none !important;
   }}
+
+  /* ── Hide heading anchor links ───────────────────────────────────────── */
+  h1 a, h2 a, h3 a {{ display: none !important; }}
 </style>
 """
 
