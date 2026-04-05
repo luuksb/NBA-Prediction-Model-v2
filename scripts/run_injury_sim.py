@@ -108,9 +108,49 @@ def main() -> None:
         sim_records.append({"team_id": team, **summary})
         logger.info("Team %-4s  mean_avail=%.3f  std=%.3f", team, summary["mean"], summary["std"])
 
-    # ── Export ────────────────────────────────────────────────────────────────
+    # ── Export summary parquet (backward-compat for availability_pct feature) ─
     out_path = export.export_injury_sims(sim_records, year=args.year)
     logger.info("Output: %s  (%d teams)", out_path, len(sim_records))
+
+    # ── Pre-draw binary injury array ──────────────────────────────────────────
+    # Shape: (n_teams, N_STARS, N_ROUNDS, n_sims) of uniform [0, 1) draws.
+    # The simulation compares each draw against the player's mean availability
+    # rate to produce a binary healthy/injured outcome per series.
+    N_ROUNDS = 4
+    N_STARS = 3
+
+    teams_sorted = sorted(top_players["team"].unique().tolist())
+    n_teams = len(teams_sorted)
+    team_idx_map = {t: idx for idx, t in enumerate(teams_sorted)}
+
+    avail_lookup: dict[str, float] = (
+        availability_rates.set_index("player_name_norm")["availability_rate"].to_dict()
+    )
+
+    player_bpm: list[list[float]] = [[0.0] * N_STARS for _ in range(n_teams)]
+    mean_rates: list[list[float]] = [[0.85] * N_STARS for _ in range(n_teams)]
+
+    for team, group in top_players.groupby("team"):
+        t = team_idx_map[team]
+        top3 = (
+            group.sort_values("composite_rating", ascending=False)
+            .head(N_STARS)
+            .reset_index(drop=True)
+        )
+        for star_i in range(len(top3)):
+            row = top3.iloc[star_i]
+            raw_bpm = pd.to_numeric(row.get("bpm", 0.0), errors="coerce")
+            player_bpm[t][star_i] = float(raw_bpm) if pd.notna(raw_bpm) else 0.0
+            mean_rates[t][star_i] = min(float(avail_lookup.get(row["player_name_norm"], 0.85)), 0.975)
+
+    draws = rng.uniform(size=(n_teams, N_STARS, N_ROUNDS, args.n_draws))
+    meta: dict = {
+        "teams": teams_sorted,
+        "player_bpm": player_bpm,
+        "mean_rates": mean_rates,
+    }
+    npy_path, json_path = export.export_injury_draws(draws, meta, year=args.year)
+    logger.info("Injury draws: %s  meta: %s", npy_path, json_path)
     logger.info("=== Injury Simulation DONE ===")
 
 

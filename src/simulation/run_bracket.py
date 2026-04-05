@@ -23,7 +23,7 @@ def run_simulations(
     team_features: pd.DataFrame,
     window: str = "full",
     n_sims: int = N_SIMULATIONS,
-    injury_draws: dict[str, np.ndarray] | None = None,
+    injury_draws: dict | None = None,
     seed: int | None = None,
 ) -> list[dict]:
     """Run N full bracket simulations and return per-iteration outcomes.
@@ -35,7 +35,8 @@ def run_simulations(
         team_features: DataFrame indexed by team ID with feature columns.
         window: Training window name ('full', 'modern', 'recent').
         n_sims: Number of Monte Carlo iterations.
-        injury_draws: Optional dict from team_id → availability array (length >= n_sims).
+        injury_draws: Optional dict produced by load_injury_draws() with pre-drawn
+            binary injury array and metadata (teams, player BPM, mean rates).
         seed: Optional random seed for reproducibility.
 
     Returns:
@@ -83,6 +84,7 @@ def run_simulations(
                     spec=spec,
                     injury_draws=injury_draws,
                     draw_index=i,
+                    round_num=series.round_num,
                     series_deltas=series_deltas,
                 )
                 series.winner = winner
@@ -96,11 +98,39 @@ def run_simulations(
 
         # Conference finalists are the winners of round 3
         finals_series = bracket.rounds[-1][0] if bracket.rounds[-1][0].round_num == 4 else None
+
+        # Count Finals-round injuries for each finalist (if injury draws available)
+        finalist_east_injuries: int | None = None
+        finalist_west_injuries: int | None = None
+        if injury_draws and finals_series:
+            draws_arr: np.ndarray = injury_draws["draws"]
+            team_index: dict[str, int] = injury_draws["team_index"]
+            mean_rates_meta: list[list[float]] = injury_draws["mean_rates"]
+            r4 = min(3, draws_arr.shape[2] - 1)  # round 4, 0-indexed
+            n_stars = draws_arr.shape[1]
+            for team_id, slot in (
+                (finals_series.high_seed, "east"),
+                (finals_series.low_seed, "west"),
+            ):
+                if team_id in team_index:
+                    t = team_index[team_id]
+                    n_injured = sum(
+                        1
+                        for star_i in range(n_stars)
+                        if draws_arr[t, star_i, r4, i] > mean_rates_meta[t][star_i]
+                    )
+                    if slot == "east":
+                        finalist_east_injuries = n_injured
+                    else:
+                        finalist_west_injuries = n_injured
+
         outcomes.append({
             "iteration": i,
             "champion": champion,
             "finalist_east": finals_series.high_seed if finals_series else None,
             "finalist_west": finals_series.low_seed if finals_series else None,
+            "finalist_east_injuries": finalist_east_injuries,
+            "finalist_west_injuries": finalist_west_injuries,
             "round_exits": round_exits,
         })
 

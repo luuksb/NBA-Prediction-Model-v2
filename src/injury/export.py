@@ -6,6 +6,7 @@ that can be merged into the series dataset as the availability_pct feature.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -59,3 +60,39 @@ def export_injury_sims(
     df.to_parquet(out_path, index=False)
     logger.info("Injury sim results for %d saved to %s  (%d rows)", year, out_path, len(df))
     return out_path
+
+
+def export_injury_draws(
+    draws: np.ndarray,
+    meta: dict,
+    year: int,
+    output_dir: Path = INJURY_SIM_DIR,
+) -> tuple[Path, Path]:
+    """Save pre-drawn binary injury array and metadata for bracket simulation.
+
+    Persists a uniform random array of shape (n_teams, n_stars, n_rounds, n_sims)
+    to a .npy file, and a companion JSON with team ordering, per-player raw BPM
+    values, and mean availability rates.
+
+    Args:
+        draws: Uniform random array of shape (n_teams, n_stars, n_rounds, n_sims).
+        meta: Dict with keys 'teams' (list of team IDs), 'player_bpm'
+            (n_teams × n_stars raw BPM values), 'mean_rates'
+            (n_teams × n_stars historical availability rates).
+        year: Season year (used in output filenames).
+        output_dir: Parent directory for outputs.
+
+    Returns:
+        Tuple (npy_path, json_path) of the written files.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    npy_path = output_dir / f"injury_draws_{year}.npy"
+    json_path = output_dir / f"injury_meta_{year}.json"
+    np.save(npy_path, draws)
+    with open(json_path, "w") as f:
+        json.dump(meta, f)
+    logger.info(
+        "Injury draws for %d saved to %s  shape=%s",
+        year, npy_path, draws.shape,
+    )
+    return npy_path, json_path

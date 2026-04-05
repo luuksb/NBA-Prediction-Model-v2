@@ -75,8 +75,9 @@ def simulate_series(
     team_features: pd.DataFrame,
     rng: np.random.Generator,
     spec: dict,
-    injury_draws: dict[str, np.ndarray] | None = None,
+    injury_draws: dict | None = None,
     draw_index: int = 0,
+    round_num: int = 1,
     series_deltas: dict[str, float] | None = None,
 ) -> str:
     """Simulate a single series and return the winner.
@@ -87,9 +88,16 @@ def simulate_series(
         team_features: DataFrame indexed by team ID with raw feature columns.
         rng: Numpy random generator for the win/loss draw.
         spec: Model spec dict (from load_spec()).
-        injury_draws: Optional dict mapping team_id → array of simulated
-            availability percentages (one per bracket iteration).
-        draw_index: Index into injury_draws arrays for this iteration.
+        injury_draws: Optional dict produced by load_injury_draws() with keys:
+            'draws' (ndarray shape n_teams × n_stars × n_rounds × n_sims),
+            'team_index' (dict team_id → int), 'player_bpm' (n_teams × n_stars),
+            'mean_rates' (n_teams × n_stars). For each star player, a pre-drawn
+            uniform value is compared against their mean availability rate to
+            produce a binary healthy/injured outcome; injured players contribute
+            0 to bpm_avail_sum.
+        draw_index: Index along the n_sims dimension (i.e. current iteration i).
+        round_num: 1-indexed playoff round number (1–4); used to select the
+            correct round slice from the draws array.
         series_deltas: Optional pre-computed delta values for series-level
             features (e.g. {'delta_home_court_advantage': 1.0}). Passed
             through to predict_win_prob.
@@ -100,15 +108,27 @@ def simulate_series(
     row_high = team_features.loc[high_seed].to_dict() if high_seed in team_features.index else {}
     row_low = team_features.loc[low_seed].to_dict() if low_seed in team_features.index else {}
 
-    # Apply injury availability: scale availability-weighted features by the draw
+    # Apply injury: binary per-player draw — only evaluated for teams that
+    # have actually reached this round (lazy: called only when needed).
     if injury_draws:
+        draws_arr: np.ndarray = injury_draws["draws"]
+        team_index: dict[str, int] = injury_draws["team_index"]
+        player_bpm: list[list[float]] = injury_draws["player_bpm"]
+        mean_rates: list[list[float]] = injury_draws["mean_rates"]
+        r = min(round_num - 1, draws_arr.shape[2] - 1)  # 0-indexed round
+        s = draw_index
+        n_stars = draws_arr.shape[1]
+
         for team_id, row in ((high_seed, row_high), (low_seed, row_low)):
-            if team_id in injury_draws:
-                avail = float(injury_draws[team_id][draw_index])
+            if team_id in team_index:
+                t = team_index[team_id]
+                healthy_bpm = sum(
+                    player_bpm[t][i]
+                    for i in range(n_stars)
+                    if draws_arr[t, i, r, s] <= mean_rates[t][i]
+                )
                 row = dict(row)  # avoid mutating the original
-                for feat in ("bpm_avail_sum", "per_avail_sum", "usg_avail_sum"):
-                    if feat in row and row[feat] is not None:
-                        row[feat] = row[feat] * avail
+                row["bpm_avail_sum"] = healthy_bpm
                 if team_id == high_seed:
                     row_high = row
                 else:

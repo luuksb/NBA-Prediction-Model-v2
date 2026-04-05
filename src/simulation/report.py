@@ -31,6 +31,7 @@ def save_simulation_report(
     year: int,
     window: str,
     actual_champion: str | None = None,
+    outcomes: list[dict] | None = None,
 ) -> Path:
     """Write simulation results to results/simulations/{year}_{window}/.
 
@@ -39,6 +40,9 @@ def save_simulation_report(
         year: Season year.
         window: Training window name (e.g. 'modern').
         actual_champion: Actual champion for historical/validation years.
+        outcomes: Optional raw per-iteration outcome list from run_simulations().
+            When provided, saved as iterations.parquet with per-sim finalist and
+            injury columns for post-hoc analysis.
 
     Returns:
         Path to the output directory.
@@ -74,6 +78,23 @@ def save_simulation_report(
         [{"team": t, "championship_prob": p} for t, p in aggregated["championship_prob"].items()]
     ).sort_values("championship_prob", ascending=False)
     champ_df.to_parquet(out_dir / "championship_probs.parquet", index=False)
+
+    # Per-iteration parquet (finalist + injury tracking)
+    if outcomes is not None:
+        iter_rows = [
+            {
+                "iteration": o["iteration"],
+                "champion": o["champion"],
+                "finalist_east": o.get("finalist_east"),
+                "finalist_west": o.get("finalist_west"),
+                "finalist_east_injuries": o.get("finalist_east_injuries"),
+                "finalist_west_injuries": o.get("finalist_west_injuries"),
+            }
+            for o in outcomes
+        ]
+        iter_df = pd.DataFrame(iter_rows)
+        iter_df.to_parquet(out_dir / "iterations.parquet", index=False)
+        logger.info("Per-iteration data saved to %s", out_dir / "iterations.parquet")
 
     logger.info("Simulation report saved to %s", out_dir)
     return out_dir
