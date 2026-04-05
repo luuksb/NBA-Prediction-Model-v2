@@ -141,7 +141,7 @@ def main() -> None:
             row = top3.iloc[star_i]
             raw_bpm = pd.to_numeric(row.get("bpm", 0.0), errors="coerce")
             player_bpm[t][star_i] = float(raw_bpm) if pd.notna(raw_bpm) else 0.0
-            mean_rates[t][star_i] = min(float(avail_lookup.get(row["player_name_norm"], 0.85)), 0.975)
+            mean_rates[t][star_i] = min(float(avail_lookup.get(row["player_name_norm"], 0.85)), 0.99)
 
     draws = rng.uniform(size=(n_teams, N_STARS, N_ROUNDS, args.n_draws))
     meta: dict = {
