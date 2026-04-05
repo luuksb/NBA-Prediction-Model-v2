@@ -172,6 +172,26 @@ def load_bracket_seeds(year: int) -> dict[str, list[str]]:
     return bracket_seeds.get(year, {})
 
 
+_ESPN_ABBREV_MAP: dict[str, str] = {
+    # Kaggle abbrev → ESPN CDN abbrev
+    "GSW": "gs",
+    "NYK": "ny",
+    "SAS": "sa",
+    "NOP": "no",
+    "NOH": "no",
+    "UTA": "utah",
+    "PHO": "phx",
+    "WAS": "wsh",
+    "BRK": "bkn",
+    "CHO": "cha",
+    "CHH": "cha",
+    # Historical franchises (best-effort; may not exist on ESPN CDN)
+    "NJN": "nj",
+    "SEA": "sea",
+    "WSB": "wsh",
+}
+
+
 def logo_url(abbrev: str) -> str:
     """Return the ESPN CDN logo URL for a team abbreviation.
 
@@ -183,4 +203,5 @@ def logo_url(abbrev: str) -> str:
     """
     cfg = load_dashboard_config()
     template = cfg["logos"]["espn_cdn_template"]
-    return template.format(abbrev=abbrev.lower())
+    espn_abbrev = _ESPN_ABBREV_MAP.get(abbrev.upper(), abbrev).lower()
+    return template.format(abbrev=espn_abbrev)
