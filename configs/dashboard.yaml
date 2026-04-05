@@ -19,7 +19,7 @@ ui:
   upset_threshold: 0.50   # min conditional win prob for a lower seed to be flagged (rounds 2-4)
   colors:
     champion_border: "#FFD700"
-    default_border:  "#1a3a5c"
-    background:      "#0a1929"
-    card_background: "#0d2137"
-    accent:          "#4a9eff"
+    default_border:  "#2a3f5f"
+    background:      "#1a2035"
+    card_background: "#1e2a45"
+    accent:          "#5ab4ff"
