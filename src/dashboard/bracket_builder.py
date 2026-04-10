@@ -80,7 +80,15 @@ def compute_win_prob(
     logit = spec["intercept"]
     for feat in spec["features"]:
         raw = feat.removeprefix("delta_")
-        delta = float(row_high.get(raw, 0.0)) - float(row_low.get(raw, 0.0))
+        v_high = row_high.get(raw)
+        v_low = row_low.get(raw)
+        if v_high is None or v_low is None:
+            return 0.5
+        v_high = float(v_high)
+        v_low = float(v_low)
+        if math.isnan(v_high) or math.isnan(v_low):
+            return 0.5
+        delta = v_high - v_low
         logit += spec["coefficients"][feat] * delta
     return 1.0 / (1.0 + math.exp(-logit))
 

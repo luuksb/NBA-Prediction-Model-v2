@@ -1,20 +1,25 @@
-"""Export Monte Carlo simulation results to a static JSON file for the web app.
+"""Export Monte Carlo simulation results to static JSON files for the web app.
 
 Usage:
-    python scripts/export_for_web.py
+    # Single run:
     python scripts/export_for_web.py --run_id 2025_modern --output nba_results.json
+
+    # All runs (writes one JSON per run + index.json):
+    python scripts/export_for_web.py --all --output_dir ../NBA_prediction_web_app/public/data/seasons
 
 Reads simulation outputs from results/simulations/<run_id>/, model spec from
 results/model_selection/chosen_model_<window>.json, and bracket seeds from
-configs/bracket_seeds.yaml. Writes a self-contained JSON file consumable by
+configs/bracket_seeds.yaml. Writes self-contained JSON files consumable by
 the NBA_prediction_web_app frontend.
 
-Output schema
--------------
-metadata          season, n_simulations, training_window, features, model metrics
-teams             per-team display info (name, colors, seed, conference)
-bracket           West/East/Finals matchups with win probabilities per round
+Output schema (per run)
+-----------------------
+metadata            season, n_simulations, training_window, features,
+                    coefficients, intercept, model metrics
+teams               per-team display info (name, colors, seed, conference)
+bracket             West/East/Finals matchups with win probabilities per round
 championship_probs  per-team championship probability from Monte Carlo
+actual_champion     actual champion string (null for future years)
 """
 
 from __future__ import annotations
@@ -38,10 +43,11 @@ from src.dashboard.data_loader import (
 from src.dashboard.html_renderer import TEAM_COLORS
 
 # ---------------------------------------------------------------------------
-# Team full names (display only)
+# Team full names (display only) — includes historical/defunct franchises
 # ---------------------------------------------------------------------------
 
 _TEAM_NAMES: dict[str, str] = {
+    # Current franchises
     "ATL": "Atlanta Hawks",
     "BOS": "Boston Celtics",
     "BKN": "Brooklyn Nets",
@@ -72,6 +78,19 @@ _TEAM_NAMES: dict[str, str] = {
     "TOR": "Toronto Raptors",
     "UTA": "Utah Jazz",
     "WAS": "Washington Wizards",
+    # Historical/defunct franchises
+    "WSB": "Washington Bullets",
+    "NJN": "New Jersey Nets",
+    "SEA": "Seattle SuperSonics",
+    "VAN": "Vancouver Grizzlies",
+    "CHH": "Charlotte Hornets",
+    "NOH": "New Orleans Hornets",
+    "NOK": "New Orleans/Oklahoma City Hornets",
+    "PHO": "Phoenix Suns",
+    "NJA": "New Jersey Americans",
+    "SDC": "San Diego Clippers",
+    "KCK": "Kansas City Kings",
+    "GSW": "Golden State Warriors",
 }
 
 
@@ -286,10 +305,13 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
             "n_simulations": int(summary["n_sims"]),
             "training_window": window_label,
             "features": spec["features"],
+            "coefficients": spec.get("coefficients", {}),
+            "intercept": spec.get("intercept"),
             "pseudo_r2": round(metrics["mcfadden_r2"], 4) if metrics["mcfadden_r2"] is not None else None,
             "auc": round(metrics["auc_roc"], 4) if metrics["auc_roc"] is not None else None,
             "brier_score": round(metrics["brier_score"], 4) if metrics["brier_score"] is not None else None,
         },
+        "actual_champion": summary.get("actual_champion"),
         "teams": teams,
         "bracket": build_bracket_json(bracket),
         "championship_probs": champ_probs,
@@ -306,6 +328,91 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Bulk export
+# ---------------------------------------------------------------------------
+
+
+def discover_run_ids() -> list[str]:
+    """Return all available run_ids sorted by year then window.
+
+    Returns:
+        Sorted list of run_id strings (e.g. ['1986_full', '1986_modern', ...]).
+    """
+    sim_dir = Path("results/simulations")
+    run_ids = []
+    window_order = {"full": 0, "modern": 1, "recent": 2}
+    for d in sim_dir.iterdir():
+        if not d.is_dir():
+            continue
+        if not (d / "summary.json").exists():
+            continue
+        parts = d.name.split("_", 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            run_ids.append(d.name)
+    run_ids.sort(key=lambda r: (int(r.split("_")[0]), window_order.get(r.split("_", 1)[1], 99)))
+    return run_ids
+
+
+def export_all(output_dir: str) -> None:
+    """Export all discovered simulation runs and write an index.json manifest.
+
+    Individual run files are written to output_dir/{run_id}.json.
+    An index file is written to {parent_of_output_dir}/index.json.
+
+    Args:
+        output_dir: Directory path for per-run JSON files.
+    """
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    run_ids = discover_run_ids()
+    print(f"Found {len(run_ids)} simulation runs.")
+
+    index_entries: list[dict[str, Any]] = []
+    errors: list[str] = []
+
+    for run_id in run_ids:
+        file_path = out_path / f"{run_id}.json"
+        try:
+            exported = export_run(run_id, str(file_path))
+            parts = run_id.split("_", 1)
+            year = int(parts[0])
+            window = parts[1]
+            summary_path = Path("results/simulations") / run_id / "summary.json"
+            with open(summary_path) as f:
+                summary = json.load(f)
+            index_entries.append({
+                "run_id": run_id,
+                "year": year,
+                "window": window,
+                "year_type": summary.get("year_type", "historical"),
+                "predicted_champion": summary.get("predicted_champion"),
+                "actual_champion": summary.get("actual_champion"),
+                "file": f"seasons/{run_id}.json",
+            })
+        except Exception as exc:
+            print(f"  ERROR exporting {run_id}: {exc}")
+            errors.append(f"{run_id}: {exc}")
+
+    index_path = out_path.parent / "index.json"
+    with open(index_path, "w") as f:
+        json.dump(
+            {
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "runs": index_entries,
+            },
+            f,
+            indent=2,
+        )
+    print(f"Wrote index -> {index_path}  ({len(index_entries)} runs)")
+
+    if errors:
+        print(f"\n{len(errors)} run(s) failed:")
+        for e in errors:
+            print(f"  {e}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -315,18 +422,34 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Export NBA simulation results to JSON for the web app."
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--run_id",
-        default="2025_modern",
-        help="Simulation run ID, e.g. '2025_modern' (default: 2025_modern)",
+        default=None,
+        help="Single simulation run ID, e.g. '2025_modern'",
+    )
+    mode.add_argument(
+        "--all",
+        action="store_true",
+        help="Export all discovered simulation runs",
     )
     parser.add_argument(
         "--output",
         default="nba_results.json",
-        help="Output JSON file path (default: nba_results.json)",
+        help="Output JSON file path for single-run mode (default: nba_results.json)",
+    )
+    parser.add_argument(
+        "--output_dir",
+        default="../NBA_prediction_web_app/public/data/seasons",
+        help="Output directory for --all mode (default: ../NBA_prediction_web_app/public/data/seasons)",
     )
     args = parser.parse_args()
-    export_run(args.run_id, args.output)
+
+    if args.all:
+        export_all(args.output_dir)
+    else:
+        run_id = args.run_id or "2025_modern"
+        export_run(run_id, args.output)
 
 
 if __name__ == "__main__":
