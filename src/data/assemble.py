@@ -368,6 +368,130 @@ def save_final_dataset(df: pd.DataFrame, output_dir: Path = FINAL_DIR) -> Path:
     return out_path
 
 
+def _build_step_feature_map() -> dict[str, list[str]]:
+    """Build a mapping from step name to raw feature names from features.yaml.
+
+    Reads the active features from FEATURES_CONFIG and groups them by their
+    producing step, excluding series-level features (which are already deltas
+    with no per-team raw values) and injury-module features.
+
+    Returns:
+        Dict mapping step_name → list of raw feature names (delta_ prefix removed).
+    """
+    with open(FEATURES_CONFIG) as f:
+        config = yaml.safe_load(f)
+
+    step_to_raw: dict[str, list[str]] = {}
+    for feat in config["features"]:
+        if not feat.get("active", True):
+            continue
+        step = feat.get("producing_step", "")
+        if not step.startswith("steps/"):
+            continue  # skip injury_module features
+        step_name = step.replace("steps/", "")
+        if feat.get("series_level", False):
+            continue  # already a delta, no per-team raw values to pivot
+        raw_name = feat["name"].removeprefix("delta_")
+        step_to_raw.setdefault(step_name, []).append(raw_name)
+    return step_to_raw
+
+
+def _extract_team_ratings_result(
+    seasons: list[int],
+    step_to_raw_features: dict[str, list[str]],
+) -> pd.DataFrame:
+    """Load team ratings and return a (season, team, *features) DataFrame.
+
+    Args:
+        seasons: Season end-years to pull stats for.
+        step_to_raw_features: Mapping from step name to raw feature names
+            (output of _build_step_feature_map).
+
+    Returns:
+        DataFrame with columns: season, team, <available team_ratings features>.
+    """
+    from src.data.steps import team_ratings as tr_mod
+
+    tr_raw_features = step_to_raw_features.get("team_ratings", [])
+    team_stats = tr_mod.build_team_stats(seasons)
+    available_tr = [f for f in tr_raw_features if f in team_stats.columns]
+    if len(available_tr) < len(tr_raw_features):
+        missing = set(tr_raw_features) - set(available_tr)
+        logger.warning("build_team_season_features: team_ratings columns not found: %s", missing)
+    return team_stats[["season", "team"] + available_tr].copy()
+
+
+def _pivot_intermediate_features(
+    r1: pd.DataFrame,
+    step_to_raw_features: dict[str, list[str]],
+    intermediate_dir: Path,
+) -> list[pd.DataFrame]:
+    """Pivot *_high / *_low columns from intermediate parquets into per-team rows.
+
+    For each step that has intermediate data, reads the parquet, matches it to
+    Round 1 series so each team appears exactly once per season, then unpivots
+    the _high/_low columns into separate team rows.
+
+    Args:
+        r1: Round 1 series slice with columns: series_id, season,
+            team_high, team_low.
+        step_to_raw_features: Mapping from step name to raw feature names
+            (output of _build_step_feature_map).
+        intermediate_dir: Directory containing per-step parquet files.
+
+    Returns:
+        List of (season, team, *features) DataFrames, one per step that had
+        data. Empty list if no intermediate files were found.
+    """
+    intermediates_to_pivot = {
+        "player_ratings": step_to_raw_features.get("player_ratings", []),
+        "playoff_experience": step_to_raw_features.get("playoff_experience", []),
+        "coach_experience": step_to_raw_features.get("coach_experience", []),
+    }
+
+    result_frames: list[pd.DataFrame] = []
+    for step_name, raw_features in intermediates_to_pivot.items():
+        if not raw_features:
+            continue
+        path = intermediate_dir / f"{step_name}.parquet"
+        if not path.exists():
+            logger.warning(
+                "build_team_season_features: intermediate not found: %s — skipping.", path
+            )
+            continue
+
+        step_df = pd.read_parquet(path)
+        merged = r1.merge(step_df, on=["season", "series_id"], how="left")
+
+        found_raw = [f for f in raw_features if f"{f}_high" in step_df.columns]
+        if not found_raw:
+            logger.warning(
+                "build_team_season_features: no *_high/*_low columns found for %s in %s",
+                raw_features,
+                step_name,
+            )
+            continue
+
+        rename_high = {f"{f}_high": f for f in found_raw}
+        rename_low = {f"{f}_low": f for f in found_raw}
+        high_cols = [f"{f}_high" for f in found_raw]
+        low_cols = [f"{f}_low" for f in found_raw]
+
+        high_df = merged[["season", "team_high"] + high_cols].rename(
+            columns={"team_high": "team", **rename_high}
+        )
+        low_df = merged[["season", "team_low"] + low_cols].rename(
+            columns={"team_low": "team", **rename_low}
+        )
+
+        combined = pd.concat([high_df, low_df], ignore_index=True).drop_duplicates(
+            subset=["season", "team"], keep="first"
+        )
+        result_frames.append(combined)
+
+    return result_frames
+
+
 def build_team_season_features(
     base: pd.DataFrame,
     intermediate_dir: Path = INTERMEDIATE_DIR,
@@ -398,91 +522,21 @@ def build_team_season_features(
         DataFrame with columns: year, team, <all extractable active features>.
         Also saves to output_dir/team_season_features.parquet.
     """
-    from src.data.steps import team_ratings as tr_mod
-
-    with open(FEATURES_CONFIG) as f:
-        config = yaml.safe_load(f)
-
-    # Build mapping: raw_feature_name -> producing_step
-    step_to_raw_features: dict[str, list[str]] = {}
-    for feat in config["features"]:
-        if not feat.get("active", True):
-            continue
-        step = feat.get("producing_step", "")
-        if not step.startswith("steps/"):
-            continue  # skip injury_module features
-        step_name = step.replace("steps/", "")
-        if feat.get("series_level", False):
-            continue  # already a delta, no per-team raw values to pivot
-        raw_name = feat["name"].removeprefix("delta_")
-        step_to_raw_features.setdefault(step_name, []).append(raw_name)
-
+    step_to_raw_features = _build_step_feature_map()
     seasons = sorted(base["season"].unique().tolist())
 
-    # ── 1. Team ratings: call build_team_stats() directly ─────────────────────
-    tr_raw_features = step_to_raw_features.get("team_ratings", [])
-    team_stats = tr_mod.build_team_stats(seasons)
-    available_tr = [f for f in tr_raw_features if f in team_stats.columns]
-    if len(available_tr) < len(tr_raw_features):
-        missing = set(tr_raw_features) - set(available_tr)
-        logger.warning("build_team_season_features: team_ratings columns not found: %s", missing)
-    result = team_stats[["season", "team"] + available_tr].copy()
+    # ── 1. Team ratings ────────────────────────────────────────────────────────
+    result = _extract_team_ratings_result(seasons, step_to_raw_features)
 
-    # ── 2. Intermediates with _high/_low columns ───────────────────────────────
-    # Use Round 1 rows so each team appears exactly once per season.
+    # ── 2. Intermediate _high/_low pivots ──────────────────────────────────────
     r1 = base[base["round"] == "first_round"][
         ["series_id", "season", "team_high", "team_low"]
     ].copy()
-
-    intermediates_to_pivot = {
-        "player_ratings": step_to_raw_features.get("player_ratings", []),
-        "playoff_experience": step_to_raw_features.get("playoff_experience", []),
-        "coach_experience": step_to_raw_features.get("coach_experience", []),
-    }
-
-    for step_name, raw_features in intermediates_to_pivot.items():
-        if not raw_features:
-            continue
-        path = intermediate_dir / f"{step_name}.parquet"
-        if not path.exists():
-            logger.warning(
-                "build_team_season_features: intermediate not found: %s — skipping.", path
-            )
-            continue
-
-        step_df = pd.read_parquet(path)
-        merged = r1.merge(step_df, on=["season", "series_id"], how="left")
-
-        # Determine which raw features have _high/_low in this intermediate
-        found_raw = [f for f in raw_features if f"{f}_high" in step_df.columns]
-        if not found_raw:
-            logger.warning(
-                "build_team_season_features: no *_high/*_low columns found for %s in %s",
-                raw_features,
-                step_name,
-            )
-            continue
-
-        high_cols = [f"{f}_high" for f in found_raw]
-        low_cols = [f"{f}_low" for f in found_raw]
-        rename_high = {f"{f}_high": f for f in found_raw}
-        rename_low = {f"{f}_low": f for f in found_raw}
-
-        high_df = merged[["season", "team_high"] + high_cols].rename(
-            columns={"team_high": "team", **rename_high}
-        )
-        low_df = merged[["season", "team_low"] + low_cols].rename(
-            columns={"team_low": "team", **rename_low}
-        )
-
-        combined = pd.concat([high_df, low_df], ignore_index=True).drop_duplicates(
-            subset=["season", "team"], keep="first"
-        )
-
+    for combined in _pivot_intermediate_features(r1, step_to_raw_features, intermediate_dir):
         result = result.merge(combined, on=["season", "team"], how="left")
 
+    # ── 3. Finalise and save ───────────────────────────────────────────────────
     result = result.rename(columns={"season": "year"})
-
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / "team_season_features.parquet"
     result.to_parquet(out_path, index=False)

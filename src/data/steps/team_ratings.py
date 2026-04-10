@@ -54,6 +54,28 @@ _META_COLS = frozenset(
 MISSINGNESS_STOP_THRESHOLD = 0.20
 
 
+def _load_team_stats(csv_path: Path, seasons: list[int]) -> pd.DataFrame:
+    """Load a team stats CSV and return playoff teams for the given seasons.
+
+    Shared implementation for both Per 100 Poss and Summaries files: filters to
+    NBA playoff teams, coerces non-meta columns to numeric, and returns
+    (season, abbreviation, *stat_cols).
+
+    Args:
+        csv_path: Path to the CSV file to load.
+        seasons: Season end-years to include.
+
+    Returns:
+        DataFrame with columns: season, abbreviation + all numeric stat columns.
+    """
+    df = pd.read_csv(csv_path)
+    df = df[(df["lg"] == "NBA") & (df["playoffs"] == True) & (df["season"].isin(seasons))].copy()
+    stat_cols = [c for c in df.columns if c not in _META_COLS]
+    for col in stat_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df[["season", "abbreviation"] + stat_cols].reset_index(drop=True)
+
+
 def _load_per100_stats(seasons: list[int]) -> pd.DataFrame:
     """Load Team Stats Per 100 Poss.csv and return playoff teams for given seasons.
 
@@ -66,14 +88,7 @@ def _load_per100_stats(seasons: list[int]) -> pd.DataFrame:
     Returns:
         DataFrame with columns: season, abbreviation + all numeric stat columns.
     """
-    df = pd.read_csv(PER100_CSV)
-    df = df[(df["lg"] == "NBA") & (df["playoffs"] == True) & (df["season"].isin(seasons))].copy()
-
-    stat_cols = [c for c in df.columns if c not in _META_COLS]
-    for col in stat_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    return df[["season", "abbreviation"] + stat_cols].reset_index(drop=True)
+    return _load_team_stats(PER100_CSV, seasons)
 
 
 def _load_summary_stats(seasons: list[int]) -> pd.DataFrame:
@@ -85,14 +100,7 @@ def _load_summary_stats(seasons: list[int]) -> pd.DataFrame:
     Returns:
         DataFrame with columns: season, abbreviation + all numeric stat columns.
     """
-    df = pd.read_csv(SUMMARIES_CSV)
-    df = df[(df["lg"] == "NBA") & (df["playoffs"] == True) & (df["season"].isin(seasons))].copy()
-
-    stat_cols = [c for c in df.columns if c not in _META_COLS]
-    for col in stat_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    return df[["season", "abbreviation"] + stat_cols].reset_index(drop=True)
+    return _load_team_stats(SUMMARIES_CSV, seasons)
 
 
 def _check_missingness(df: pd.DataFrame, stat_cols: list[str], label: str) -> None:

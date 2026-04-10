@@ -294,8 +294,33 @@ def run_quality_checks(
     report_path = output_dir / "dq_report.parquet"
     report.to_parquet(report_path, index=False)
 
-    # ── Human-readable summary ─────────────────────────────────────────────────
     summary_path = output_dir / "dq_summary.txt"
+    _write_quality_summary(report, dup_check, balance_check, df, features, summary_path)
+
+    logger.info("DQ report written to %s", report_path)
+    logger.info("DQ summary written to %s", summary_path)
+    return report_path
+
+
+def _write_quality_summary(
+    report: pd.DataFrame,
+    dup_check: dict,
+    balance_check: dict,
+    df: pd.DataFrame,
+    features: list[str],
+    summary_path: Path,
+) -> None:
+    """Write a human-readable DQ summary text file.
+
+    Args:
+        report: Per-feature check results from run_feature_checks(), with a
+            'window' column prepended.
+        dup_check: Output of check_duplicate_series_ids().
+        balance_check: Output of check_class_balance().
+        df: Full assembled dataset (used for shape / season range metadata).
+        features: List of feature names that were checked.
+        summary_path: Destination path for the .txt file.
+    """
     with open(summary_path, "w", encoding="utf-8") as f:
         f.write("NBA Playoff Model — Data Quality Summary\n")
         f.write("=" * 72 + "\n\n")
@@ -355,10 +380,14 @@ def run_quality_checks(
                         else "  —"
                     )
                     std_ = (
-                        f"{row.get('std', float('nan')):.2f}" if pd.notna(row.get("std")) else "  —"
+                        f"{row.get('std', float('nan')):.2f}"
+                        if pd.notna(row.get("std"))
+                        else "  —"
                     )
                     min_ = (
-                        f"{row.get('min', float('nan')):.2f}" if pd.notna(row.get("min")) else "  —"
+                        f"{row.get('min', float('nan')):.2f}"
+                        if pd.notna(row.get("min"))
+                        else "  —"
                     )
                     med_ = (
                         f"{row.get('median', float('nan')):.2f}"
@@ -366,7 +395,9 @@ def run_quality_checks(
                         else "  —"
                     )
                     max_ = (
-                        f"{row.get('max', float('nan')):.2f}" if pd.notna(row.get("max")) else "  —"
+                        f"{row.get('max', float('nan')):.2f}"
+                        if pd.notna(row.get("max"))
+                        else "  —"
                     )
                     out_ = (
                         f"{row.get('outlier_rate', float('nan')):.1%}"
@@ -390,7 +421,3 @@ def run_quality_checks(
                             f"outlier={row.get('outlier_rate','?')}\n"
                         )
             f.write("\n")
-
-    logger.info("DQ report written to %s", report_path)
-    logger.info("DQ summary written to %s", summary_path)
-    return report_path

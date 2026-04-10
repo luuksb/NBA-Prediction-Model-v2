@@ -376,6 +376,101 @@ def _build_series_availability(
     return {(row.series_id, row.player_norm): row.avail for row in appearances.itertuples()}
 
 
+def _accumulate_rank_cols(
+    df: pd.DataFrame,
+    top_n_idx: pd.DataFrame,
+    avail_lookup: dict,
+    series_with_avail: set,
+    team_col: str,
+    n: int,
+) -> dict[int, dict[str, list]]:
+    """Accumulate per-star stats and availability for every row in df.
+
+    For each row and each star rank 1..n, looks up the star's metrics from
+    top_n_idx and their series availability from avail_lookup.
+
+    Args:
+        df: Series-level DataFrame (must have series_id, season, team_col).
+        top_n_idx: DataFrame indexed by (season, team, star_rank) with columns
+            bpm, per, usg, player_norm.
+        avail_lookup: Dict keyed by (series_id, player_norm) → avail in [0, 1].
+        series_with_avail: Set of series_ids that have any avail data; used to
+            distinguish "0 games played" (0.0) from "pre-1997 unknown" (NaN).
+        team_col: Column name for the team side ('team_high' or 'team_low').
+        n: Number of star ranks to accumulate.
+
+    Returns:
+        Dict mapping star_rank → {'bpm', 'per', 'usg', 'avail', 'player_norm'}
+        where each value is a list aligned to df.index.
+    """
+    rank_cols: dict[int, dict[str, list]] = {
+        r: {"bpm": [], "per": [], "usg": [], "avail": [], "player_norm": []}
+        for r in range(1, n + 1)
+    }
+    for row in df.itertuples():
+        team = getattr(row, team_col)
+        season = row.season
+        series_id = row.series_id
+        for r in range(1, n + 1):
+            try:
+                star = top_n_idx.loc[(season, team, r)]
+                bpm = float(star["bpm"]) if not pd.isna(star["bpm"]) else np.nan
+                per = float(star["per"]) if not pd.isna(star["per"]) else np.nan
+                usg = float(star["usg"]) if not pd.isna(star["usg"]) else np.nan
+                player_norm = str(star["player_norm"])
+            except KeyError:
+                bpm = per = usg = np.nan
+                player_norm = ""
+            # For series with avail data, a missing entry means 0 games played
+            # (injured/DNP). For pre-1997 series (no game logs), NaN signals
+            # "unknown" and is later treated as full availability.
+            if series_id in series_with_avail:
+                avail = avail_lookup.get((series_id, player_norm), 0.0)
+            else:
+                avail = avail_lookup.get((series_id, player_norm), np.nan)
+            rank_cols[r]["bpm"].append(bpm)
+            rank_cols[r]["per"].append(per)
+            rank_cols[r]["usg"].append(usg)
+            rank_cols[r]["avail"].append(avail)
+            rank_cols[r]["player_norm"].append(player_norm)
+    return rank_cols
+
+
+def _compute_star_flags(
+    df: pd.DataFrame,
+    rank_cols: dict[int, dict[str, list]],
+    n: int,
+    superstar_set: set,
+) -> list[float]:
+    """Compute star_flag values for each row in df.
+
+    star_flag = avail if any top-N player is in superstar_set, else 0.0.
+    Scans stars by rank order and uses the first match's availability.
+    For pre-2002 seasons (no EPM data) the value will always be 0.0.
+
+    Args:
+        df: Series-level DataFrame (must have a 'season' column).
+        rank_cols: Output of _accumulate_rank_cols.
+        n: Number of star ranks.
+        superstar_set: Set of (season, player_norm) tuples for EPM/BPM top-5.
+
+    Returns:
+        List of float values aligned to df.index.
+    """
+    flag_vals: list[float] = []
+    for i in range(len(df)):
+        val = 0.0
+        season_i = df["season"].iat[i]
+        for r in range(1, n + 1):
+            pnorm = rank_cols[r]["player_norm"][i]
+            if (season_i, pnorm) in superstar_set:
+                avail_raw = rank_cols[r]["avail"][i]
+                val = 1.0 if pd.isna(avail_raw) else float(avail_raw)
+                break
+        flag_vals.append(val)
+    return flag_vals
+
+
 def run(df: pd.DataFrame) -> pd.DataFrame:
     """Attach per-star player ratings and availability-weighted composite features.
 
@@ -414,7 +509,6 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     player_stats = _load_player_stats(seasons)
     top_n = _identify_top_n(player_stats, n)
     top_n_idx = top_n.set_index(["season", "team", "star_rank"])
-
     avail_lookup = _build_series_availability(df)
 
     # Superstar set: EPM top-5 for 2002+, BPM top-5 for earlier seasons.
@@ -442,46 +536,13 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     for side, team_col in (("high", "team_high"), ("low", "team_low")):
-        # Accumulate values for all ranks in one pass over df rows
-        rank_cols: dict[int, dict[str, list]] = {
-            r: {"bpm": [], "per": [], "usg": [], "avail": [], "player_norm": []}
-            for r in range(1, n + 1)
-        }
-
-        for row in df.itertuples():
-            team = getattr(row, team_col)
-            season = row.season
-            series_id = row.series_id
-
-            for r in range(1, n + 1):
-                try:
-                    star = top_n_idx.loc[(season, team, r)]
-                    bpm = float(star["bpm"]) if not pd.isna(star["bpm"]) else np.nan
-                    per = float(star["per"]) if not pd.isna(star["per"]) else np.nan
-                    usg = float(star["usg"]) if not pd.isna(star["usg"]) else np.nan
-                    player_norm = str(star["player_norm"])
-                except KeyError:
-                    bpm = per = usg = np.nan
-                    player_norm = ""
-
-                # For series with avail data, a missing entry means 0 games
-                # played (injured/DNP). For pre-1997 series (no game logs),
-                # NaN signals "unknown" and is later treated as full avail.
-                if series_id in series_with_avail:
-                    avail = avail_lookup.get((series_id, player_norm), 0.0)
-                else:
-                    avail = avail_lookup.get((series_id, player_norm), np.nan)
-
-                rank_cols[r]["bpm"].append(bpm)
-                rank_cols[r]["per"].append(per)
-                rank_cols[r]["usg"].append(usg)
-                rank_cols[r]["avail"].append(avail)
-                rank_cols[r]["player_norm"].append(player_norm)
+        rank_cols = _accumulate_rank_cols(
+            df, top_n_idx, avail_lookup, series_with_avail, team_col, n
+        )
 
         for r in range(1, n + 1):
             # Raw availability (0–1 or NaN for pre-1997); stored for reference
             df[f"star{r}_avail_{side}"] = rank_cols[r]["avail"]
-
             # Individual metric columns are availability-weighted:
             # metric × avail, with avail=1.0 assumed when unknown (pre-1997)
             avail_s = pd.Series(rank_cols[r]["avail"], index=df.index).fillna(1.0)
@@ -511,21 +572,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         # Top star's BPM × availability: isolates the best player's contribution.
         df[f"star_bpm_avail_{side}"] = df[f"star1_bpm_{side}"]
 
-        # star_flag: 1 × avail if any top-N star is an EPM/BPM superstar, else 0.
-        # Scans stars by rank order; uses the first match's availability.
-        # For pre-2002 seasons (no EPM data) this will always be 0.
-        flag_vals: list[float] = []
-        for i in range(len(df)):
-            val = 0.0
-            for r in range(1, n + 1):
-                pnorm = rank_cols[r]["player_norm"][i]
-                season_i = df["season"].iat[i]
-                if (season_i, pnorm) in superstar_set:
-                    avail_raw = rank_cols[r]["avail"][i]
-                    val = 1.0 * (1.0 if pd.isna(avail_raw) else float(avail_raw))
-                    break
-            flag_vals.append(val)
-        df[f"star_flag_{side}"] = flag_vals
+        df[f"star_flag_{side}"] = _compute_star_flags(df, rank_cols, n, superstar_set)
 
     for side in ("high", "low"):
         n_nan = df[f"star1_avail_{side}"].isna().sum()
