@@ -190,3 +190,8 @@ nba-playoff-model/
 - Don't import across module boundaries — if you need shared utilities, that's a sign the data contract needs updating
 - Don't hardcode 2025 or 2026 — use config values so years are easily updatable
 - Don't retry Basketball Reference if it blocks once — log and use alternative sources
+
+## Available Review Skills
+- `structural-review/SKILL.md` — architecture, module boundaries, SoC
+- `style-review/SKILL.md` — naming, docs, complexity, DRY
+- `REVIEW_AGENT.md` — orchestrates both into a full review
