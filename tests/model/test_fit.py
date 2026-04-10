@@ -20,7 +20,7 @@ def _make_df(n: int = 50, seed: int = 0) -> pd.DataFrame:
         "year": [2000 + i % 24 for i in range(n)],
         "feat1": x1,
         "feat2": x2,
-        "high_seed_wins": y,
+        "higher_seed_wins": y,
     })
 
 

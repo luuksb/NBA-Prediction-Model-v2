@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.data.assemble import assemble_dataset, compute_deltas, load_active_features, save_final_dataset
+from src.data.assemble import _join_intermediates, compute_deltas, load_active_features, save_final_dataset
 
 
 class TestLoadActiveFeatures:
@@ -18,18 +18,20 @@ class TestLoadActiveFeatures:
         assert len(load_active_features()) > 0
 
 
-class TestAssembleDataset:
+class TestJoinIntermediates:
     def test_raises_when_no_intermediates(self, tmp_path):
+        base = pd.DataFrame({"season": [2020], "series_id": ["a"]})
         with pytest.raises(FileNotFoundError):
-            assemble_dataset(intermediate_dir=tmp_path)
+            _join_intermediates(base, intermediate_dir=tmp_path)
 
-    def test_joins_on_year_series_id(self, tmp_path):
-        base = pd.DataFrame({"year": [2020, 2021], "series_id": ["a", "b"], "feat1": [1.0, 2.0]})
-        extra = pd.DataFrame({"year": [2020, 2021], "series_id": ["a", "b"], "feat2": [3.0, 4.0]})
-        base.to_parquet(tmp_path / "step1.parquet", index=False)
-        extra.to_parquet(tmp_path / "step2.parquet", index=False)
+    def test_joins_on_season_series_id(self, tmp_path):
+        base = pd.DataFrame({"season": [2020, 2021], "series_id": ["a", "b"]})
+        step1 = pd.DataFrame({"season": [2020, 2021], "series_id": ["a", "b"], "feat1": [1.0, 2.0]})
+        step2 = pd.DataFrame({"season": [2020, 2021], "series_id": ["a", "b"], "feat2": [3.0, 4.0]})
+        step1.to_parquet(tmp_path / "step1.parquet", index=False)
+        step2.to_parquet(tmp_path / "step2.parquet", index=False)
 
-        result = assemble_dataset(intermediate_dir=tmp_path)
+        result = _join_intermediates(base, intermediate_dir=tmp_path)
         assert "feat1" in result.columns
         assert "feat2" in result.columns
         assert len(result) == 2
@@ -39,15 +41,15 @@ class TestComputeDeltas:
     def test_paired_columns_become_delta(self):
         df = pd.DataFrame({"off_rtg_high": [110.0], "off_rtg_low": [105.0]})
         result = compute_deltas(df)
-        assert "off_rtg_delta" in result.columns
+        assert "delta_off_rtg" in result.columns
         assert "off_rtg_high" not in result.columns
         assert "off_rtg_low" not in result.columns
-        assert result["off_rtg_delta"].iloc[0] == pytest.approx(5.0)
+        assert result["delta_off_rtg"].iloc[0] == pytest.approx(5.0)
 
     def test_delta_is_high_minus_low(self):
         df = pd.DataFrame({"bpm_top3_mean_high": [3.0], "bpm_top3_mean_low": [5.0]})
         result = compute_deltas(df)
-        assert result["bpm_top3_mean_delta"].iloc[0] == pytest.approx(-2.0)
+        assert result["delta_bpm_top3_mean"].iloc[0] == pytest.approx(-2.0)
 
     def test_unmatched_columns_untouched(self):
         df = pd.DataFrame({"off_rtg_high": [110.0], "some_other_col": [1.0]})
@@ -66,7 +68,7 @@ class TestComputeDeltas:
             "bpm_top3_mean_high": [3.0], "bpm_top3_mean_low": [1.0],
         })
         result = compute_deltas(df)
-        assert set(result.columns) == {"off_rtg_delta", "bpm_top3_mean_delta"}
+        assert set(result.columns) == {"delta_off_rtg", "delta_bpm_top3_mean"}
 
 
 class TestSaveFinalDataset:
