@@ -129,10 +129,10 @@ def _load_coach_team_year() -> pd.DataFrame:
         for path in sorted(COACHES_API_DIR.glob("*.json")):
             try:
                 with open(path, encoding="utf-8") as fh:
-                    d = json.load(fh)
-                season = int(d["season"])
-                team_id = int(d["team_id"])
-                coach_name = str(d["coach_name"]).strip()
+                    coach_data = json.load(fh)
+                season = int(coach_data["season"])
+                team_id = int(coach_data["team_id"])
+                coach_name = str(coach_data["coach_name"]).strip()
                 abbrev = TEAM_ID_ABBREV.get(team_id)
                 if abbrev is None:
                     logger.debug("Unknown team_id %d in %s — skipping.", team_id, path.name)

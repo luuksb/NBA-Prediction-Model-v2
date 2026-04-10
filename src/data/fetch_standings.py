@@ -159,15 +159,15 @@ def fmt_seeds(seeds: list[str]) -> str:
 def write_yaml(all_seeds: dict[int, dict[str, list[str]]], path: Path) -> None:
     lines = [YAML_HEADER]
     for year in sorted(all_seeds):
-        e = all_seeds[year]["east"]
-        w = all_seeds[year]["west"]
-        e_comment = ", ".join(f"{t} {i+1}" for i, t in enumerate(e))
-        w_comment = ", ".join(f"{t} {i+1}" for i, t in enumerate(w))
+        east_seeds = all_seeds[year]["east"]
+        west_seeds = all_seeds[year]["west"]
+        e_comment = ", ".join(f"{t} {i+1}" for i, t in enumerate(east_seeds))
+        w_comment = ", ".join(f"{t} {i+1}" for i, t in enumerate(west_seeds))
         lines.append(f"  {year}:")
         lines.append(f"    # East: {e_comment}")
-        lines.append(f"    east: {fmt_seeds(e)}")
+        lines.append(f"    east: {fmt_seeds(east_seeds)}")
         lines.append(f"    # West: {w_comment}")
-        lines.append(f"    west: {fmt_seeds(w)}")
+        lines.append(f"    west: {fmt_seeds(west_seeds)}")
         lines.append("")
     lines.append(YAML_2025)
     path.write_text("\n".join(lines), encoding="utf-8")

@@ -115,17 +115,17 @@ def simulate_series(
         team_index: dict[str, int] = injury_draws["team_index"]
         player_bpm: list[list[float]] = injury_draws["player_bpm"]
         mean_rates: list[list[float]] = injury_draws["mean_rates"]
-        r = min(round_num - 1, draws_arr.shape[2] - 1)  # 0-indexed round
-        s = draw_index
+        round_idx = min(round_num - 1, draws_arr.shape[2] - 1)  # 0-indexed round
+        sim_idx = draw_index
         n_stars = draws_arr.shape[1]
 
         for team_id, row in ((high_seed, row_high), (low_seed, row_low)):
             if team_id in team_index:
-                t = team_index[team_id]
+                team_idx = team_index[team_id]
                 healthy_bpm = sum(
-                    player_bpm[t][i]
+                    player_bpm[team_idx][i]
                     for i in range(n_stars)
-                    if draws_arr[t, i, r, s] <= mean_rates[t][i]
+                    if draws_arr[team_idx, i, round_idx, sim_idx] <= mean_rates[team_idx][i]
                 )
                 row = dict(row)  # avoid mutating the original
                 row["bpm_avail_sum"] = healthy_bpm

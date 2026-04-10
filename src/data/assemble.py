@@ -254,9 +254,9 @@ def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
         delta_col = f"delta_{base_name}"
 
         if delta_col not in df.columns:
-            h = pd.to_numeric(df[high_col], errors="coerce")
-            l = pd.to_numeric(df[low_col], errors="coerce")
-            df[delta_col] = h - l
+            high_val = pd.to_numeric(df[high_col], errors="coerce")
+            low_val = pd.to_numeric(df[low_col], errors="coerce")
+            df[delta_col] = high_val - low_val
 
         cols_to_drop.extend([high_col, low_col])
 
