@@ -27,11 +27,11 @@ Output df has all original columns plus the eight features above.
 from __future__ import annotations
 
 import logging
-import re
-import unicodedata
 from pathlib import Path
 
 import pandas as pd
+
+from src.shared.text_utils import normalise_player_name as _normalise_name
 
 logger = logging.getLogger(__name__)
 
@@ -43,22 +43,6 @@ ADVANCED_CSV = RAW_DIR / "Advanced.csv"
 FIRST_SEASON = 1980
 AVAIL_START_SEASON = 1997  # first season with playoff_player_stats data
 MIN_GAMES_ROSTER = 5  # min regular-season games to count as "on roster"
-
-
-# ── Name normalisation ─────────────────────────────────────────────────────────
-
-
-def _normalise_name(name: str) -> str:
-    """Lowercase, strip diacritics, replace non-alphanumeric with underscores.
-
-    Mirrors the normalisation used in player_ratings.py so that names from
-    Advanced.csv and playoff_player_stats CSVs match each other.
-    """
-    ascii_name = (
-        unicodedata.normalize("NFKD", str(name)).encode("ascii", errors="ignore").decode("ascii")
-    )
-    normalised = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
-    return re.sub(r"_(?:jr|sr|ii|iii|iv|v)$", "", normalised)
 
 
 # ── Team-level series stats ────────────────────────────────────────────────────

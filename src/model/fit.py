@@ -122,7 +122,7 @@ def fit_all(
             try:
                 spec = fit_logit(df, features, w["name"], w["start_year"], w["end_year"])
                 results.append(spec)
-            except Exception as exc:
+            except (ValueError, np.linalg.LinAlgError) as exc:
                 logger.warning("Skipped features=%s window=%s: %s", features, w["name"], exc)
 
     logger.info("Successfully fitted %d / %d models.", len(results), total)

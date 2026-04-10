@@ -36,13 +36,13 @@ Input df must have columns: series_id, season, team_high, team_low.
 from __future__ import annotations
 
 import logging
-import re
-import unicodedata
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yaml
+
+from src.shared.text_utils import normalise_player_name as _normalise_name
 
 logger = logging.getLogger(__name__)
 
@@ -104,22 +104,6 @@ def _compute_composite_rating(
         rating += (weight / total_weight) * z
     return rating
 
-
-def _normalise_name(name: str) -> str:
-    """Lowercase, strip diacritics, replace spaces/punctuation with underscores.
-
-    Diacritic stripping ensures names like 'Kukoč' (Advanced.csv) and 'Kukoc'
-    (nba_api) normalise to the same key.
-
-    Generational suffixes (Jr., Sr., II, III, IV, V) are stripped so that
-    PlayerStatisticsMisc entries like 'Jimmy Butler III' match the Advanced.csv
-    entry 'Jimmy Butler'.
-    """
-    ascii_name = (
-        unicodedata.normalize("NFKD", str(name)).encode("ascii", errors="ignore").decode("ascii")
-    )
-    normalised = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
-    return re.sub(r"_(?:jr|sr|ii|iii|iv|v)$", "", normalised)
 
 
 def _load_n_stars() -> int:

@@ -79,7 +79,7 @@ def fetch_bref_once(url: str) -> pd.DataFrame | None:
     try:
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
-    except Exception as exc:
+    except requests.exceptions.RequestException as exc:
         logger.warning(
             "Basketball Reference fetch FAILED (%s). Will not retry. "
             "Log: %s — switching to alternative source.",

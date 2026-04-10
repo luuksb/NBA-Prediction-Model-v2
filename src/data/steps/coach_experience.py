@@ -144,7 +144,7 @@ def _load_coach_team_year() -> pd.DataFrame:
                         "coach_key": _normalise_name(coach_name),
                     }
                 )
-            except Exception as exc:
+            except (json.JSONDecodeError, KeyError, ValueError) as exc:
                 logger.warning("Could not parse %s: %s", path.name, exc)
     else:
         logger.warning("coaches_nba_api/ directory not found; 2012-2024 coach data missing.")

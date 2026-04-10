@@ -19,6 +19,7 @@ import warnings
 from math import comb
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -254,7 +255,7 @@ def _fit_all_models(
                         (df["year"] >= w["start_year"]) & (df["year"] <= w["end_year"])
                     ]
                     metric_rows.append(evaluate_model(spec, window_df))
-                except Exception as exc:
+                except (ValueError, np.linalg.LinAlgError) as exc:
                     convergence_failures += 1
                     logger.warning("Skipped features=%s window=%s: %s", features, w["name"], exc)
 

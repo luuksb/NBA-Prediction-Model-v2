@@ -137,7 +137,7 @@ def build_leaderboard(
         try:
             metrics = evaluate_model(spec, df)
             rows.append(metrics)
-        except Exception as exc:
+        except (ValueError, KeyError) as exc:
             logger.warning(
                 "Could not evaluate spec features=%s window=%s: %s",
                 spec["features"],
