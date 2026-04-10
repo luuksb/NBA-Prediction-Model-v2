@@ -191,6 +191,7 @@ def _build_coach_record_table(
         *before* that season.
     """
     all_series = _load_all_series(up_to_season=max_season + 1)
+    # Guard: no data to accumulate — return empty rather than raising downstream.
     if all_series.empty or coach_team.empty:
         return pd.DataFrame()
 

@@ -82,7 +82,9 @@ def _cond_win_prob(abbrev: str, round_num: int, adv_df: pd.DataFrame) -> float:
         adv_df: round_advancement DataFrame.
 
     Returns:
-        Float in [0, 1]. Returns 0.0 if adv_prob(round_num) == 0.
+        Float in [0, 1] representing P(win | reached).
+        Returns 0.0 when adv_prob(round_num) == 0, i.e. the team never
+        reached this round in any simulation so the conditional is undefined.
     """
     denom = _get_adv_prob(abbrev, round_num, adv_df)
     if denom == 0.0:

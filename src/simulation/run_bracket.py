@@ -35,8 +35,10 @@ def run_simulations(
         team_features: DataFrame indexed by team ID with feature columns.
         window: Training window name ('full', 'modern', 'recent').
         n_sims: Number of Monte Carlo iterations.
-        injury_draws: Optional dict produced by load_injury_draws() with pre-drawn
-            binary injury array and metadata (teams, player BPM, mean rates).
+        injury_draws: Optional dict produced by load_injury_draws() with keys:
+            'draws' (ndarray shape n_teams × n_stars × n_rounds × n_sims),
+            'team_index' (dict team_id → int), 'player_bpm' (n_teams × n_stars),
+            'mean_rates' (n_teams × n_stars).
         seed: Optional random seed for reproducibility.
 
     Returns:

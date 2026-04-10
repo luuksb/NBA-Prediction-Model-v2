@@ -99,6 +99,7 @@ def _compute_composite_rating(
             continue
         col = pd.to_numeric(players_df[metric], errors="coerce").fillna(0.0)
         std = col.std()
+        # z-score normalisation: centres and scales each metric before weighting
         z = (col - col.mean()) / std if std > 0 else pd.Series(0.0, index=players_df.index)
         rating += (weight / total_weight) * z
     return rating

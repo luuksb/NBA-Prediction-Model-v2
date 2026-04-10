@@ -1,14 +1,16 @@
 """quality.py — Data quality checks on the assembled series dataset.
 
-Runs DQ checks on all feature columns (not just registered features) and
-across all training windows, the validation year, and the prediction year.
+Runs DQ checks:
+  - On all feature columns (not just those registered in features.yaml)
+  - Across all configured training windows
+  - For the validation year and prediction year
 
-Required checks (per task spec):
-  - Missing values per column
+Required checks:
+  - Missing values per column (missingness rate)
   - Duplicate series IDs
   - Feature distributions (mean, std, min/max, percentiles)
   - Class balance of the dependent variable (higher_seed_wins)
-  - Obvious outliers (IQR method)
+  - Obvious outliers (IQR method, ±3 IQRs from median)
 
 Outputs:
   data/quality_reports/dq_report.parquet   — structured per-feature report
