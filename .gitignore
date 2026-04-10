@@ -53,3 +53,6 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 *.swp
+
+# Generated web export (copy to NBA_prediction_web_app/public/data/ manually)
+nba_results.json
