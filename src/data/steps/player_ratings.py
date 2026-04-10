@@ -53,9 +53,9 @@ PLAYOFF_SERIES_DIR = RAW_DIR / "playoff_series"
 EPM_PARQUET = RAW_DIR / "epm.parquet"
 FEATURES_YAML = Path("configs/features.yaml")
 
-MIN_GAMES = 10          # minimum regular-season games to be eligible as a star
+MIN_GAMES = 10  # minimum regular-season games to be eligible as a star
 AVAIL_START_SEASON = 1997  # first season with game-level playoff data
-EPM_START_SEASON = 2002   # first season with EPM data
+EPM_START_SEASON = 2002  # first season with EPM data
 METRICS = ("bpm", "per", "usg")
 
 
@@ -116,9 +116,7 @@ def _normalise_name(name: str) -> str:
     entry 'Jimmy Butler'.
     """
     ascii_name = (
-        unicodedata.normalize("NFKD", str(name))
-        .encode("ascii", errors="ignore")
-        .decode("ascii")
+        unicodedata.normalize("NFKD", str(name)).encode("ascii", errors="ignore").decode("ascii")
     )
     normalised = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
     return re.sub(r"_(?:jr|sr|ii|iii|iv|v)$", "", normalised)
@@ -203,9 +201,7 @@ def _load_epm_set(seasons: list[int]) -> set[tuple[int, str]]:
         return set()
 
     epm = pd.read_parquet(EPM_PARQUET, columns=["season", "player_name"])
-    epm = epm[
-        (epm["season"].isin(epm_seasons)) & (epm["player_name"] != "Locked Player")
-    ].copy()
+    epm = epm[(epm["season"].isin(epm_seasons)) & (epm["player_name"] != "Locked Player")].copy()
     epm["player_norm"] = epm["player_name"].map(_normalise_name)
 
     return {(int(row.season), row.player_norm) for row in epm.itertuples()}
@@ -303,11 +299,7 @@ def _load_series_game_counts(seasons: list[int]) -> dict[str, int]:
             frames.append(pd.read_csv(path, usecols=["series_id", "games_played"]))
     if not frames:
         return {}
-    return (
-        pd.concat(frames, ignore_index=True)
-        .set_index("series_id")["games_played"]
-        .to_dict()
-    )
+    return pd.concat(frames, ignore_index=True).set_index("series_id")["games_played"].to_dict()
 
 
 def _build_series_availability(
@@ -357,9 +349,7 @@ def _build_series_availability(
         .reset_index()
     )
     game_teams.columns = ["gameId", "season", "teams"]
-    game_teams["series_id"] = [
-        series_key.get((r.season, r.teams)) for r in game_teams.itertuples()
-    ]
+    game_teams["series_id"] = [series_key.get((r.season, r.teams)) for r in game_teams.itertuples()]
     game_teams = game_teams.dropna(subset=["series_id"])
 
     if game_teams.empty:
@@ -379,14 +369,11 @@ def _build_series_availability(
     series_games = _load_series_game_counts(avail_seasons)
     appearances["series_games"] = appearances["series_id"].map(series_games)
     appearances = appearances.dropna(subset=["series_games"])
-    appearances["avail"] = (
-        appearances["games_played"] / appearances["series_games"]
-    ).clip(0.0, 1.0)
+    appearances["avail"] = (appearances["games_played"] / appearances["series_games"]).clip(
+        0.0, 1.0
+    )
 
-    return {
-        (row.series_id, row.player_norm): row.avail
-        for row in appearances.itertuples()
-    }
+    return {(row.series_id, row.player_norm): row.avail for row in appearances.itertuples()}
 
 
 def run(df: pd.DataFrame) -> pd.DataFrame:
@@ -418,7 +405,10 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     n = _load_n_stars()
     logger.info(
         "player_ratings: top-%d stars for %d seasons (%d–%d)",
-        n, len(seasons), seasons[0], seasons[-1],
+        n,
+        len(seasons),
+        seasons[0],
+        seasons[-1],
     )
 
     player_stats = _load_player_stats(seasons)
@@ -435,7 +425,9 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(
         "player_ratings: superstar set — %d EPM entries (2002+), %d BPM entries (pre-2002), "
         "%d total",
-        len(epm_set), len(bpm_set), len(superstar_set),
+        len(epm_set),
+        len(bpm_set),
+        len(superstar_set),
     )
     logger.info(
         "player_ratings: availability entries loaded: %d (series, player) pairs",
@@ -498,9 +490,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
                 ("per", rank_cols[r]["per"]),
                 ("usg", rank_cols[r]["usg"]),
             ):
-                df[f"star{r}_{metric}_{side}"] = (
-                    pd.Series(vals, index=df.index) * avail_s
-                )
+                df[f"star{r}_{metric}_{side}"] = pd.Series(vals, index=df.index) * avail_s
 
         # Weighted sums are now just the sum of the already-weighted individual cols
         for metric in METRICS:
@@ -512,8 +502,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         # = bpm_avail_sum / sum(raw_bpm_r)  →  1.0 when all stars play fully.
         # Pre-1997: avail assumed 1.0, so this equals 1.0 for all teams.
         raw_bpm_sum = sum(
-            pd.Series(rank_cols[r]["bpm"], index=df.index).fillna(0.0)
-            for r in range(1, n + 1)
+            pd.Series(rank_cols[r]["bpm"], index=df.index).fillna(0.0) for r in range(1, n + 1)
         )
         df[f"bpm_weighted_avail_{side}"] = (
             df[f"bpm_avail_sum_{side}"] / raw_bpm_sum.where(raw_bpm_sum > 0)
@@ -543,7 +532,10 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         logger.info(
             "player_ratings: %s side — star1 avail NaN %d/%d "
             "(pre-%d series have no game-level data)",
-            side, n_nan, len(df), AVAIL_START_SEASON,
+            side,
+            n_nan,
+            len(df),
+            AVAIL_START_SEASON,
         )
 
     return df

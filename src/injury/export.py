@@ -93,6 +93,8 @@ def export_injury_draws(
         json.dump(meta, f)
     logger.info(
         "Injury draws for %d saved to %s  shape=%s",
-        year, npy_path, draws.shape,
+        year,
+        npy_path,
+        draws.shape,
     )
     return npy_path, json_path

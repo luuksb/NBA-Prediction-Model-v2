@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 class Series:
     """A single playoff series between two teams."""
 
-    high_seed: str   # Team identifier for the higher seed
-    low_seed: str    # Team identifier for the lower seed
-    round_num: int   # 1=first round, 2=conf semis, 3=conf finals, 4=finals
+    high_seed: str  # Team identifier for the higher seed
+    low_seed: str  # Team identifier for the lower seed
+    round_num: int  # 1=first round, 2=conf semis, 3=conf finals, 4=finals
     conference: str  # 'East', 'West', or 'Finals'
     winner: str | None = None
 
@@ -100,7 +100,9 @@ def _seed_rank(team: str, bracket: Bracket) -> int:
     return bracket.west_seeds.index(team) + 1
 
 
-def _make_series(team_a: str, team_b: str, round_num: int, conference: str, bracket: Bracket) -> Series:
+def _make_series(
+    team_a: str, team_b: str, round_num: int, conference: str, bracket: Bracket
+) -> Series:
     """Create a Series, assigning high/low seed based on original seedings.
 
     When both teams share the same within-conference seed rank (only possible

@@ -52,8 +52,7 @@ COLORS = cfg["ui"]["colors"]
 with open(cfg["paths"]["training_windows_config"]) as _f:
     _tw_cfg = yaml.safe_load(_f)
 _WINDOW_SPANS: dict[str, str] = {
-    w["name"]: f"{w['start_year']}–{w['end_year']}"
-    for w in _tw_cfg["windows"]
+    w["name"]: f"{w['start_year']}–{w['end_year']}" for w in _tw_cfg["windows"]
 }
 
 # ---------------------------------------------------------------------------
@@ -546,6 +545,7 @@ st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 # HTML rendering helpers
 # ---------------------------------------------------------------------------
 
+
 def _team_node_html(
     node: dict,
     is_champion: bool = False,
@@ -574,7 +574,7 @@ def _team_node_html(
 
     logo = (
         f'<img class="team-logo" src="{url}" '
-        f'onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\';" '
+        f"onerror=\"this.style.display='none';this.nextSibling.style.display='flex';\" "
         f'alt="{abbrev}">'
         f'<span class="team-logo-fallback" style="display:none">{abbrev}</span>'
     )
@@ -583,10 +583,10 @@ def _team_node_html(
         f'<div class="team-pill" style="background:{pill_bg}">'
         f'<div class="team-seed-badge">{seed}</div>'
         f'<span class="team-abbrev">{abbrev}</span>'
-        f'</div>'
+        f"</div>"
         f'<div class="team-logo-area" style="background:{logo_bg}">{logo}</div>'
         f'<span class="team-prob">{prob_pct}</span>'
-        f'</div>'
+        f"</div>"
     )
 
 
@@ -606,9 +606,9 @@ def _matchup_html(
     lo_cp = champ_probs.get(lo["abbrev"]) if champ_probs else None
     return (
         f'<div class="matchup">'
-        f'{_team_node_html(hi, is_champion=hi_champ, prob_mode=prob_mode, champ_prob=hi_cp, is_finals=is_finals)}'
-        f'{_team_node_html(lo, is_champion=lo_champ, prob_mode=prob_mode, champ_prob=lo_cp, is_finals=is_finals)}'
-        f'</div>'
+        f"{_team_node_html(hi, is_champion=hi_champ, prob_mode=prob_mode, champ_prob=hi_cp, is_finals=is_finals)}"
+        f"{_team_node_html(lo, is_champion=lo_champ, prob_mode=prob_mode, champ_prob=lo_cp, is_finals=is_finals)}"
+        f"</div>"
     )
 
 
@@ -621,22 +621,19 @@ def _round_col_html(
 ) -> str:
     """Render one round column (label + all matchups)."""
     rendered = [
-        _matchup_html(m, champion_abbrev=champion_abbrev, is_finals=is_finals)
-        for m in matchups
+        _matchup_html(m, champion_abbrev=champion_abbrev, is_finals=is_finals) for m in matchups
     ]
     # Wrap consecutive pairs in .matchup-pair for bracket-arm connectors.
     inner = ""
     for i in range(0, len(rendered), 2):
-        pair = rendered[i:i + 2]
+        pair = rendered[i : i + 2]
         if len(pair) == 2:
             inner += f'<div class="matchup-pair">{"".join(pair)}</div>'
         else:
             inner += pair[0]
     extra_cls = f" {css_class}" if css_class else ""
     return (
-        f'<div class="round-col{extra_cls}">'
-        f'<div class="round-col-body">{inner}</div>'
-        f'</div>'
+        f'<div class="round-col{extra_cls}">' f'<div class="round-col-body">{inner}</div>' f"</div>"
     )
 
 
@@ -652,55 +649,55 @@ def _render_bracket_html_canvas(
     container. No connector lines (added in Prompt 2).
     """
     # ── Layout constants ──────────────────────────────────────────────────────
-    CANVAS_WIDTH  = 900   # px, full bracket width
-    CANVAS_HEIGHT = 550    # px
-    BOX_W = 130            # px, matchup box width
-    BOX_H = 105            # px, matchup box height (two 36px team rows)
+    CANVAS_WIDTH = 900  # px, full bracket width
+    CANVAS_HEIGHT = 550  # px
+    BOX_W = 130  # px, matchup box width
+    BOX_H = 105  # px, matchup box height (two 36px team rows)
 
     # ── X positions per round column ─────────────────────────────────────────
     west_r1_x = 0
-    west_r2_x = int(CANVAS_WIDTH * 0.16)          # 211
-    west_cf_x = int(CANVAS_WIDTH * 0.22)           # 382
-    finals_x  = int(CANVAS_WIDTH * 0.50 - BOX_W / 2)  # 567
+    west_r2_x = int(CANVAS_WIDTH * 0.16)  # 211
+    west_cf_x = int(CANVAS_WIDTH * 0.22)  # 382
+    finals_x = int(CANVAS_WIDTH * 0.50 - BOX_W / 2)  # 567
     east_cf_x = CANVAS_WIDTH - west_cf_x - BOX_W  # 753
     east_r2_x = CANVAS_WIDTH - west_r2_x - BOX_W  # 924
-    east_r1_x = CANVAS_WIDTH - BOX_W              # 1135
+    east_r1_x = CANVAS_WIDTH - BOX_W  # 1135
 
     # ── Y positions: distribute 4 R1 slots evenly, then center upward ────────
-    _pad  = 20
-    _slot = (CANVAS_HEIGHT - 2 * _pad) / 4        # 170 px per R1 slot
+    _pad = 20
+    _slot = (CANVAS_HEIGHT - 2 * _pad) / 4  # 170 px per R1 slot
     r1_centers = [_pad + i * _slot + _slot / 2 for i in range(4)]
     # R2 center = midpoint between the two R1 centers that feed it
     r2_centers = [
-        (r1_centers[0] + r1_centers[1]) / 2,      # 190
-        (r1_centers[2] + r1_centers[3]) / 2,      # 530
+        (r1_centers[0] + r1_centers[1]) / 2,  # 190
+        (r1_centers[2] + r1_centers[3]) / 2,  # 530
     ]
-    cf_center     = (r2_centers[0] + r2_centers[1]) / 2   # 360
-    finals_center = cf_center                               # 360
+    cf_center = (r2_centers[0] + r2_centers[1]) / 2  # 360
+    finals_center = cf_center  # 360
 
     def _box_y(center: float) -> int:
         return int(center - BOX_H / 2)
 
-    r1_y     = [_box_y(c) for c in r1_centers]    # [69, 239, 409, 579]
-    r2_y     = [_box_y(c) for c in r2_centers]    # [154, 494]
-    cf_y     = _box_y(cf_center)                   # 324
-    finals_y = _box_y(finals_center)               # 324
+    r1_y = [_box_y(c) for c in r1_centers]  # [69, 239, 409, 579]
+    r2_y = [_box_y(c) for c in r2_centers]  # [154, 494]
+    cf_y = _box_y(cf_center)  # 324
+    finals_y = _box_y(finals_center)  # 324
 
     # ── Extract bracket data ─────────────────────────────────────────────────
-    champ        = bracket.get("champion")
+    champ = bracket.get("champion")
     champ_abbrev = champ["abbrev"] if champ else None
 
     # R1 display order [1v8, 4v5, 2v7, 3v6] (raw indices 0,3,1,2) keeps adjacent
     # pairs feeding the same R2 slot so midpoints align vertically.
-    west_r1_raw     = bracket["west"][1]
+    west_r1_raw = bracket["west"][1]
     west_r1_ordered = [west_r1_raw[0], west_r1_raw[3], west_r1_raw[1], west_r1_raw[2]]
-    west_r2_list    = bracket["west"][2]
-    west_cf         = bracket["west"][3][0]
+    west_r2_list = bracket["west"][2]
+    west_cf = bracket["west"][3][0]
 
-    east_r1_raw     = bracket["east"][1]
+    east_r1_raw = bracket["east"][1]
     east_r1_ordered = [east_r1_raw[0], east_r1_raw[3], east_r1_raw[1], east_r1_raw[2]]
-    east_r2_list    = bracket["east"][2]
-    east_cf         = bracket["east"][3][0]
+    east_r2_list = bracket["east"][2]
+    east_cf = bracket["east"][3][0]
 
     finals_matchup = bracket["finals"][4][0]
 
@@ -710,9 +707,9 @@ def _render_bracket_html_canvas(
         box_specs.append((west_r1_x, r1_y[i], m, False))
     for i, m in enumerate(west_r2_list):
         box_specs.append((west_r2_x, r2_y[i], m, False))
-    box_specs.append((west_cf_x, cf_y,     west_cf,       False))
-    box_specs.append((finals_x,  finals_y, finals_matchup, True))
-    box_specs.append((east_cf_x, cf_y,     east_cf,       False))
+    box_specs.append((west_cf_x, cf_y, west_cf, False))
+    box_specs.append((finals_x, finals_y, finals_matchup, True))
+    box_specs.append((east_cf_x, cf_y, east_cf, False))
     for i, m in enumerate(east_r2_list):
         box_specs.append((east_r2_x, r2_y[i], m, False))
     for i, m in enumerate(east_r1_ordered):
@@ -723,11 +720,11 @@ def _render_bracket_html_canvas(
         (
             f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1;'
             f'transform:scale(1.3);transform-origin:center center">'
-            if is_finals else
-            f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1">'
+            if is_finals
+            else f'<div style="position:absolute;left:{x}px;top:{y}px;width:{BOX_W}px;z-index:1">'
         )
-        + f'{_matchup_html(m, champion_abbrev=champ_abbrev, is_finals=is_finals, prob_mode=prob_mode, champ_probs=champ_probs)}'
-        + f'</div>'
+        + f"{_matchup_html(m, champion_abbrev=champ_abbrev, is_finals=is_finals, prob_mode=prob_mode, champ_probs=champ_probs)}"
+        + f"</div>"
         for x, y, m, is_finals in box_specs
     )
 
@@ -737,18 +734,20 @@ def _render_bracket_html_canvas(
     # from actual box tops so stubs exit the visual midpoint between the two team
     # rows, not the lower portion of the box.
     _ACTUAL_H = 2 * 36 + 3  # 75px
-    _r1_cy  = [y + _ACTUAL_H / 2 for y in r1_y]    # actual centre of each R1 box
-    _r2_cy  = [y + _ACTUAL_H / 2 for y in r2_y]    # actual centre of each R2 box
-    _cf_cy  = cf_y     + _ACTUAL_H / 2
+    _r1_cy = [y + _ACTUAL_H / 2 for y in r1_y]  # actual centre of each R1 box
+    _r2_cy = [y + _ACTUAL_H / 2 for y in r2_y]  # actual centre of each R2 box
+    _cf_cy = cf_y + _ACTUAL_H / 2
     _fin_cy = finals_y + _ACTUAL_H / 2
 
     _S = 'stroke="#3d5a80" stroke-width="1.5" fill="none" opacity="0.85"'
 
-    def _arm_right(src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float) -> str:
+    def _arm_right(
+        src_rx: float, dst_lx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float
+    ) -> str:
         """Bracket arm extending rightward: two stubs → vertical gather bar → bridge to dest."""
-        gx = (src_rx + dst_lx)
-        gy_top = dst_cy - box_height/3
-        gy_bot = dst_cy + box_height/3
+        gx = src_rx + dst_lx
+        gy_top = dst_cy - box_height / 3
+        gy_bot = dst_cy + box_height / 3
         return (
             f'<line x1="{src_rx:.1f}" y1="{top_cy:.1f}" x2="{gx:.1f}" y2="{top_cy:.1f}" {_S}/>'
             f'<line x1="{src_rx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
@@ -756,11 +755,13 @@ def _render_bracket_html_canvas(
             f'<line x1="{gx:.1f}" y1="{bot_cy:.1f}" x2="{gx:.1f}" y2="{gy_bot:.1f}" {_S}/>'
         )
 
-    def _arm_left(src_lx: float, dst_rx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float) -> str:
+    def _arm_left(
+        src_lx: float, dst_rx: float, top_cy: float, bot_cy: float, dst_cy: float, box_height: float
+    ) -> str:
         """Bracket arm extending leftward: two stubs → vertical gather bar → bridge to dest."""
-        gx = (src_lx - dst_rx)
-        gy_top = dst_cy - box_height/3
-        gy_bot = dst_cy + box_height/3
+        gx = src_lx - dst_rx
+        gy_top = dst_cy - box_height / 3
+        gy_bot = dst_cy + box_height / 3
         return (
             f'<line x1="{src_lx:.1f}" y1="{top_cy:.1f}" x2="{dst_rx:.1f}" y2="{top_cy:.1f}" {_S}/>'
             f'<line x1="{src_lx:.1f}" y1="{bot_cy:.1f}" x2="{dst_rx:.1f}" y2="{bot_cy:.1f}" {_S}/>'
@@ -773,25 +774,31 @@ def _render_bracket_html_canvas(
 
     svg_lines = ""
     # West: R1→R2 (two pairs)
-    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x - BOX_W/2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H)
-    svg_lines += _arm_right(west_r1_x + BOX_W, west_r2_x - BOX_W/2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H)
+    svg_lines += _arm_right(
+        west_r1_x + BOX_W, west_r2_x - BOX_W / 2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H
+    )
+    svg_lines += _arm_right(
+        west_r1_x + BOX_W, west_r2_x - BOX_W / 2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H
+    )
     # West: R2→CF
-    svg_lines += _arm_right(west_r2_x + BOX_W, west_cf_x - BOX_W*1.3, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H)
+    svg_lines += _arm_right(
+        west_r2_x + BOX_W, west_cf_x - BOX_W * 1.3, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H
+    )
     # West: CF→Finals (single horizontal)
-    svg_lines += _hline(west_cf_x + BOX_W, finals_x - 0.3*BOX_W/2, _cf_cy)
+    svg_lines += _hline(west_cf_x + BOX_W, finals_x - 0.3 * BOX_W / 2, _cf_cy)
     # East: R1→R2 (two pairs, arms grow leftward)
-    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W/2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H)
-    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W/2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H)
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W / 2, _r1_cy[0], _r1_cy[1], _r2_cy[0], BOX_H)
+    svg_lines += _arm_left(east_r1_x, east_r2_x + BOX_W / 2, _r1_cy[2], _r1_cy[3], _r2_cy[1], BOX_H)
     # East: R2→CF
-    svg_lines += _arm_left(east_r2_x, east_cf_x + BOX_W*0.2, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H)
+    svg_lines += _arm_left(east_r2_x, east_cf_x + BOX_W * 0.2, _r2_cy[0], _r2_cy[1], _cf_cy, BOX_H)
     # East: CF→Finals (single horizontal)
-    svg_lines += _hline(east_cf_x, finals_x + 1.15*BOX_W, _cf_cy)
+    svg_lines += _hline(east_cf_x, finals_x + 1.15 * BOX_W, _cf_cy)
 
     svg_el = (
         f'<svg style="position:absolute;top:0;left:0;width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;'
         f'z-index:0;pointer-events:none;overflow:visible">'
-        f'{svg_lines}'
-        f'</svg>'
+        f"{svg_lines}"
+        f"</svg>"
     )
 
     # ── CSS scoped to team-node components (iframe has no parent page styles) ─
@@ -922,26 +929,26 @@ def _render_champ_prob_chart_html(
             f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
             f'<span style="font-size:9px;color:#8fa3c1;margin-bottom:2px;white-space:nowrap">{pct_label}</span>'
             f'<div style="width:80%;height:{bar_h}px;background:{color};border-radius:4px 4px 0 0"></div>'
-            f'</div>'
+            f"</div>"
         )
         logo_cells += (
             f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;padding:0 1px">'
             f'<img src="{url}" style="width:22px;height:22px;object-fit:contain" '
-            f'onerror="this.style.visibility=\'hidden\'">'
+            f"onerror=\"this.style.visibility='hidden'\">"
             f'<span style="font-size:8px;color:#8fa3c1;margin-top:1px">{team}</span>'
-            f'</div>'
+            f"</div>"
         )
 
     return (
         f'<div style="font-family:sans-serif;background:transparent;width:100%">'
         f'<div style="display:flex;align-items:flex-end;width:100%;height:{MAX_BAR_H + 22}px;'
         f'border-bottom:1px solid #2a3a54">'
-        f'{bar_cells}'
-        f'</div>'
+        f"{bar_cells}"
+        f"</div>"
         f'<div style="display:flex;width:100%;margin-top:4px">'
-        f'{logo_cells}'
-        f'</div>'
-        f'</div>'
+        f"{logo_cells}"
+        f"</div>"
+        f"</div>"
     )
 
 
@@ -1078,7 +1085,10 @@ panel_col, _gap_col, main_col = st.columns([1.2, 0.2, 5])
 
 with panel_col:
     st.markdown('<div style="height:0.3rem"></div>', unsafe_allow_html=True)
-    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Configuration</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Configuration</h1>',
+        unsafe_allow_html=True,
+    )
     selected_year = st.selectbox("Year", _years, index=0)
     selected_window = st.selectbox(
         "Window",
@@ -1119,11 +1129,13 @@ for _w in ["full", "modern", "recent"]:
         cfg["paths"]["training_windows_config"],
         cfg["paths"]["results_dir"],
     )
-    _insample_all.append({
-        "window": _w,
-        "span": _WINDOW_SPANS.get(_w, ""),
-        **_w_perf,
-    })
+    _insample_all.append(
+        {
+            "window": _w,
+            "span": _WINDOW_SPANS.get(_w, ""),
+            **_w_perf,
+        }
+    )
 
 _item_style = (
     "display:block;width:100%;box-sizing:border-box;background:#253350;border:none;"
@@ -1133,8 +1145,13 @@ _item_style = (
 )
 
 with panel_col:
-    st.markdown('<hr style="margin:0.3rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
-    st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Specification</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<hr style="margin:0.3rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True
+    )
+    st.markdown(
+        '<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Specification</h1>',
+        unsafe_allow_html=True,
+    )
     if spec is not None:
         _span = _WINDOW_SPANS.get(spec["window"], "")
         _span_str = f" ({_span})" if _span else ""
@@ -1152,8 +1169,13 @@ with panel_col:
 
     # ── Model performance ─────────────────────────────────────────────────
     if spec is not None:
-        st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
-        st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Performance</h1>', unsafe_allow_html=True)
+        st.markdown(
+            '<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True
+        )
+        st.markdown(
+            '<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">Model Performance</h1>',
+            unsafe_allow_html=True,
+        )
         series_ds_path = cfg["paths"]["series_dataset_path"]
         tw_config_path = cfg["paths"]["training_windows_config"]
         perf = _compute_model_performance(
@@ -1165,7 +1187,11 @@ with panel_col:
 
         feat_rows = ""
         for fs in perf["feat_stats"]:
-            sig = "***" if fs["p-value"] < 0.001 else ("**" if fs["p-value"] < 0.01 else ("*" if fs["p-value"] < 0.05 else "·"))
+            sig = (
+                "***"
+                if fs["p-value"] < 0.001
+                else ("**" if fs["p-value"] < 0.01 else ("*" if fs["p-value"] < 0.05 else "·"))
+            )
             feat_rows += (
                 f'<tr style="border-bottom:1px solid #1e2a45">'
                 f'<td style="padding:4px 6px;color:#8fa3c1;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{fs["Feature"]}</td>'
@@ -1180,7 +1206,7 @@ with panel_col:
                 f'<div style="{_item_style}">{label}: {val}</div>'
                 for label, val in [
                     ("McFadden R²", f"{perf['pseudo_r2']:.3f}"),
-                    ("AUC-ROC",     f"{perf['auc']:.3f}"),
+                    ("AUC-ROC", f"{perf['auc']:.3f}"),
                     ("Brier Score", f"{perf['brier']:.4f}"),
                 ]
             )
@@ -1192,15 +1218,20 @@ with panel_col:
             + '<th style="width:12%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">z</th>'
             + '<th style="width:18%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">p</th>'
             + '<th style="width:8%;padding:5px 6px;text-align:center;color:#8fa3c1;font-size:10px;font-weight:600"></th>'
-            + '</tr></thead>'
-            + f'<tbody>{feat_rows}</tbody>'
-            + '</table>'
+            + "</tr></thead>"
+            + f"<tbody>{feat_rows}</tbody>"
+            + "</table>"
         )
         st.markdown(perf_block, unsafe_allow_html=True)
 
         if _insample_all:
-            st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
-            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">In-Sample Fit</h1>', unsafe_allow_html=True)
+            st.markdown(
+                '<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True
+            )
+            st.markdown(
+                '<h1 style="font-size:1.6rem;margin:0 0 0.5rem 0">In-Sample Fit</h1>',
+                unsafe_allow_html=True,
+            )
             rows_html = ""
             for _r in _insample_all:
                 cs, ts = _r["correct_series"], _r["total_series"]
@@ -1224,9 +1255,9 @@ with panel_col:
                 f'<th style="width:12%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em"></th>'
                 f'<th style="width:24%;padding:5px 6px;text-align:right;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em">Championships</th>'
                 f'<th style="width:12%;padding:5px 6px;text-align:left;color:#8fa3c1;font-size:10px;font-weight:600;letter-spacing:0.05em"></th>'
-                f'</tr></thead>'
-                f'<tbody>{rows_html}</tbody>'
-                f'</table>',
+                f"</tr></thead>"
+                f"<tbody>{rows_html}</tbody>"
+                f"</table>",
                 unsafe_allow_html=True,
             )
 
@@ -1234,14 +1265,20 @@ with panel_col:
     _iter_path = Path(cfg["paths"]["results_dir"]) / selected_run / "iterations.parquet"
     if _iter_path.exists():
         _iter_df = pd.read_parquet(_iter_path)
-        _inj_df = _iter_df.dropna(subset=["finalist_east_injuries", "finalist_west_injuries"]).copy()
+        _inj_df = _iter_df.dropna(
+            subset=["finalist_east_injuries", "finalist_west_injuries"]
+        ).copy()
         if not _inj_df.empty:
             _inj_df["_east_inj"] = _inj_df["finalist_east_injuries"].astype(int)
             _inj_df["_west_inj"] = _inj_df["finalist_west_injuries"].astype(int)
             _inj_df["_total_inj"] = _inj_df["_east_inj"] + _inj_df["_west_inj"]
             _inj_df["_champ_is_east"] = _inj_df["champion"] == _inj_df["finalist_east"]
-            _inj_df["_champ_inj"] = _inj_df["_east_inj"].where(_inj_df["_champ_is_east"], _inj_df["_west_inj"])
-            _inj_df["_loser_inj"] = _inj_df["_west_inj"].where(_inj_df["_champ_is_east"], _inj_df["_east_inj"])
+            _inj_df["_champ_inj"] = _inj_df["_east_inj"].where(
+                _inj_df["_champ_is_east"], _inj_df["_west_inj"]
+            )
+            _inj_df["_loser_inj"] = _inj_df["_west_inj"].where(
+                _inj_df["_champ_is_east"], _inj_df["_east_inj"]
+            )
 
             _pct_any = (_inj_df["_total_inj"] > 0).mean()
             _one_sided = _inj_df[(_inj_df["_champ_inj"] == 0) != (_inj_df["_loser_inj"] == 0)]
@@ -1249,9 +1286,17 @@ with panel_col:
             _healthy_win_rate = _healthy_won / len(_one_sided) if len(_one_sided) > 0 else 0.0
             _pct_inj_champ = (_inj_df["_champ_inj"] > 0).mean()
 
-            st.markdown('<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True)
-            st.markdown('<h1 style="font-size:1.6rem;margin:0 0 0rem 0">Injury Impact*</h1>', unsafe_allow_html=True)
-            st.markdown('<p style="font-size:0.78rem;color:#8fa3c1;margin:0 0 0.5rem 0">* Applicable only to out-of-sample (2025–2026)</p>', unsafe_allow_html=True)
+            st.markdown(
+                '<hr style="margin:1.5rem 0 0.5rem 0;border-color:#2a3a54">', unsafe_allow_html=True
+            )
+            st.markdown(
+                '<h1 style="font-size:1.6rem;margin:0 0 0rem 0">Injury Impact*</h1>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<p style="font-size:0.78rem;color:#8fa3c1;margin:0 0 0.5rem 0">* Applicable only to out-of-sample (2025–2026)</p>',
+                unsafe_allow_html=True,
+            )
             _inj_items = [
                 f"{_pct_any:.0%} of Finals have 1+ injured star",
                 f"Healthy finalist wins {_healthy_win_rate:.0%} of 1-sided injury matchups",
@@ -1282,7 +1327,10 @@ with main_col:
     c4.metric("Actual Champion", _actual_champ)
     c5.metric("Simulations", f"{n_sims // 1000}k" if n_sims >= 1000 else str(n_sims))
 
-    st.markdown('<hr style="margin-top:2.3rem;margin-bottom:2rem;border-color:#2a3a54">', unsafe_allow_html=True)
+    st.markdown(
+        '<hr style="margin-top:2.3rem;margin-bottom:2rem;border-color:#2a3a54">',
+        unsafe_allow_html=True,
+    )
 
     prob_mode = st.radio(
         "Probability Mode",
@@ -1328,9 +1376,7 @@ with main_col:
         with shots_col:
             st.subheader("Longest Shots")
             nonzero = (
-                champ_df[champ_df["championship_prob"] > 0]
-                .sort_values("championship_prob")
-                .head(3)
+                champ_df[champ_df["championship_prob"] > 0].sort_values("championship_prob").head(3)
             )
             for _, row in nonzero.iterrows():
                 prob = float(row["championship_prob"])
@@ -1343,4 +1389,3 @@ with main_col:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-

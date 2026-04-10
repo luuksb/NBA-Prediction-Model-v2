@@ -41,11 +41,12 @@ PLAYOFF_PLAYER_STATS_DIR = RAW_DIR / "playoff_player_stats"
 ADVANCED_CSV = RAW_DIR / "Advanced.csv"
 
 FIRST_SEASON = 1980
-AVAIL_START_SEASON = 1997   # first season with playoff_player_stats data
-MIN_GAMES_ROSTER = 5        # min regular-season games to count as "on roster"
+AVAIL_START_SEASON = 1997  # first season with playoff_player_stats data
+MIN_GAMES_ROSTER = 5  # min regular-season games to count as "on roster"
 
 
 # ── Name normalisation ─────────────────────────────────────────────────────────
+
 
 def _normalise_name(name: str) -> str:
     """Lowercase, strip diacritics, replace non-alphanumeric with underscores.
@@ -54,15 +55,14 @@ def _normalise_name(name: str) -> str:
     Advanced.csv and playoff_player_stats CSVs match each other.
     """
     ascii_name = (
-        unicodedata.normalize("NFKD", str(name))
-        .encode("ascii", errors="ignore")
-        .decode("ascii")
+        unicodedata.normalize("NFKD", str(name)).encode("ascii", errors="ignore").decode("ascii")
     )
     normalised = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
     return re.sub(r"_(?:jr|sr|ii|iii|iv|v)$", "", normalised)
 
 
 # ── Team-level series stats ────────────────────────────────────────────────────
+
 
 def _load_team_series_stats(up_to_season: int) -> pd.DataFrame:
     """Build (season, team, series_wins, series_played) from playoff_series CSVs.
@@ -110,6 +110,7 @@ def _load_team_series_stats(up_to_season: int) -> pd.DataFrame:
 
 # ── Player playoff participation ───────────────────────────────────────────────
 
+
 def _build_player_participation(up_to_season: int) -> pd.DataFrame:
     """Return (player_norm, season, team) for all playoff participants.
 
@@ -152,13 +153,8 @@ def _build_player_participation(up_to_season: int) -> pd.DataFrame:
 
         # Filter to teams that actually made the playoffs
         team_stats = _load_team_series_stats(up_to_season=pre_end)
-        playoff_team_seasons = set(
-            zip(team_stats["season"].tolist(), team_stats["team"].tolist())
-        )
-        mask = [
-            (row.season, row.team) in playoff_team_seasons
-            for row in adv.itertuples()
-        ]
+        playoff_team_seasons = set(zip(team_stats["season"].tolist(), team_stats["team"].tolist()))
+        mask = [(row.season, row.team) in playoff_team_seasons for row in adv.itertuples()]
         pre_df = adv.loc[mask, ["player_norm", "season", "team"]].copy()
         parts.append(pre_df)
 
@@ -172,6 +168,7 @@ def _build_player_participation(up_to_season: int) -> pd.DataFrame:
 
 
 # ── Player-season stats ────────────────────────────────────────────────────────
+
 
 def _build_player_season_stats(max_season: int) -> pd.DataFrame:
     """Build (player_norm, season, series_wins, series_played) for all seasons.
@@ -203,6 +200,7 @@ def _build_player_season_stats(max_season: int) -> pd.DataFrame:
 
 
 # ── Current rosters ────────────────────────────────────────────────────────────
+
 
 def _build_current_rosters(max_season: int) -> pd.DataFrame:
     """Build (season, team, player_norm) for each team-season.
@@ -239,6 +237,7 @@ def _build_current_rosters(max_season: int) -> pd.DataFrame:
 
 
 # ── Roster experience table ────────────────────────────────────────────────────
+
 
 def _build_roster_experience_table(max_season: int) -> pd.DataFrame:
     """For each (team, target_season), aggregate cumulative experience of roster.
@@ -298,28 +297,27 @@ def _build_roster_experience_table(max_season: int) -> pd.DataFrame:
                     wins_sum += int(player_cum_idx.at[pn, "wins_cum"])
                     played_sum += int(player_cum_idx.at[pn, "played_cum"])
 
-            rows.append({
-                "season": target_season,
-                "team": team,
-                "series_wins_cum": wins_sum,
-                "series_played_cum": played_sum,
-                "roster_size": roster_size,
-            })
+            rows.append(
+                {
+                    "season": target_season,
+                    "team": team,
+                    "series_wins_cum": wins_sum,
+                    "series_played_cum": played_sum,
+                    "roster_size": roster_size,
+                }
+            )
 
     if not rows:
         return pd.DataFrame()
 
     result = pd.DataFrame(rows)
-    result["avg_series_wins"] = (
-        result["series_wins_cum"] / result["roster_size"].clip(lower=1)
-    )
-    result["avg_series_played"] = (
-        result["series_played_cum"] / result["roster_size"].clip(lower=1)
-    )
+    result["avg_series_wins"] = result["series_wins_cum"] / result["roster_size"].clip(lower=1)
+    result["avg_series_played"] = result["series_played_cum"] / result["roster_size"].clip(lower=1)
     return result
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
+
 
 def run(df: pd.DataFrame) -> pd.DataFrame:
     """Attach roster-based playoff experience features to a series-level DataFrame.
@@ -340,9 +338,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     max_season = int(df["season"].max())
-    logger.info(
-        "Building roster-based playoff experience table up to season %d", max_season
-    )
+    logger.info("Building roster-based playoff experience table up to season %d", max_season)
     exp = _build_roster_experience_table(max_season)
 
     if exp.empty:
@@ -385,7 +381,5 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
             for row in df.itertuples()
         ]
 
-    logger.info(
-        "playoff_experience: added 8 roster-based features to %d series rows", len(df)
-    )
+    logger.info("playoff_experience: added 8 roster-based features to %d series rows", len(df))
     return df

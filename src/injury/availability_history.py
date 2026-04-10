@@ -40,13 +40,10 @@ def compute_availability_rates(
     """
     historical = games_df[games_df[year_col] < target_year].copy()
 
-    rates = (
-        historical.groupby(player_col, as_index=False)
-        .agg(
-            total_played=(games_played_col, "sum"),
-            total_possible=(games_possible_col, "sum"),
-            n_series=(year_col, "count"),
-        )
+    rates = historical.groupby(player_col, as_index=False).agg(
+        total_played=(games_played_col, "sum"),
+        total_possible=(games_possible_col, "sum"),
+        n_series=(year_col, "count"),
     )
 
     rates["availability_rate"] = rates["total_played"] / rates["total_possible"].replace(0, pd.NA)

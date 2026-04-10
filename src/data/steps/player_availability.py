@@ -69,7 +69,7 @@ def _load_player_gp(seasons: list[int]) -> pd.DataFrame:
     adv = adv[
         (adv["lg"] == "NBA")
         & (adv["season"].isin(seasons))
-        & (adv["team"] != "TOT")   # drop totals rows for players traded mid-season
+        & (adv["team"] != "TOT")  # drop totals rows for players traded mid-season
         & (adv["g"] >= MIN_GAMES)
     ].copy()
     adv["bpm"] = pd.to_numeric(adv["bpm"], errors="coerce")
@@ -90,9 +90,7 @@ def _load_team_games(seasons: list[int]) -> pd.DataFrame:
         usecols=["season", "lg", "abbreviation", "w", "l"],
     )
     ts = ts[
-        (ts["lg"] == "NBA")
-        & (ts["season"].isin(seasons))
-        & (ts["abbreviation"].notna())
+        (ts["lg"] == "NBA") & (ts["season"].isin(seasons)) & (ts["abbreviation"].notna())
     ].copy()
     ts["team_games"] = ts["w"] + ts["l"]
     return ts[["season", "abbreviation", "team_games"]]
@@ -128,9 +126,7 @@ def _compute_top3_gp_pct(
         return float(top["gp_pct"].mean())
 
     result = (
-        player_gp.groupby(["season", "team"])
-        .apply(_top_n_mean_gp)
-        .reset_index(name="top3_gp_pct")
+        player_gp.groupby(["season", "team"]).apply(_top_n_mean_gp).reset_index(name="top3_gp_pct")
     )
     result.rename(columns={"team": "team_abbr"}, inplace=True)
     return result
@@ -158,7 +154,10 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     n_players = _load_top_player_config()
     logger.info(
         "Computing top-%d GP%% for %d seasons (%d-%d)",
-        n_players, len(seasons), seasons[0], seasons[-1],
+        n_players,
+        len(seasons),
+        seasons[0],
+        seasons[-1],
     )
 
     player_gp = _load_player_gp(seasons)
@@ -181,6 +180,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     n_nan = df["top3_gp_pct_delta"].isna().sum()
     logger.info(
         "player_availability: added top3_gp_pct_delta; NaN: %d/%d rows",
-        n_nan, len(df),
+        n_nan,
+        len(df),
     )
     return df

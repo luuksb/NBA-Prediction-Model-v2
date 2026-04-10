@@ -54,7 +54,7 @@ def extract_stats(html: str, season: int) -> list[dict]:
         List of player stat dicts, empty list if extraction fails.
     """
     # Locate the start of the stats array
-    match = re.search(r'\bstats:\[', html)
+    match = re.search(r"\bstats:\[", html)
     if not match:
         print(f"  [WARN] No stats array found for season {season}")
         return []

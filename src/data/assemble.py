@@ -35,6 +35,7 @@ LAST_SEASON = 2024
 
 # ── Base series ────────────────────────────────────────────────────────────────
 
+
 def load_base_series(
     raw_dir: Path = RAW_DIR,
     first_season: int = FIRST_SEASON,
@@ -64,8 +65,14 @@ def load_base_series(
         df = pd.read_csv(
             path,
             usecols=[
-                "season", "series_id", "round", "conference",
-                "team_high", "team_low", "seed_high", "seed_low",
+                "season",
+                "series_id",
+                "round",
+                "conference",
+                "team_high",
+                "team_low",
+                "seed_high",
+                "seed_low",
                 "higher_seed_wins",
             ],
         )
@@ -83,8 +90,7 @@ def load_base_series(
     n_dupes = base.duplicated(subset="series_id").sum()
     if n_dupes > 0:
         logger.warning(
-            "load_base_series: %d duplicate series_id values found — "
-            "keeping first occurrence.",
+            "load_base_series: %d duplicate series_id values found — " "keeping first occurrence.",
             n_dupes,
         )
         base = base.drop_duplicates(subset="series_id", keep="first")
@@ -108,6 +114,7 @@ def load_base_series(
 
 
 # ── Step runner ────────────────────────────────────────────────────────────────
+
 
 def _save_intermediate(df: pd.DataFrame, name: str, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -172,11 +179,14 @@ def run_all_steps(
         _save_intermediate(intermediate, step_name, intermediate_dir)
         logger.info(
             "Step %s: added %d columns (%s…)",
-            step_name, len(new_cols), new_cols[:3],
+            step_name,
+            len(new_cols),
+            new_cols[:3],
         )
 
 
 # ── Intermediate joiner ────────────────────────────────────────────────────────
+
 
 def _join_intermediates(
     base: pd.DataFrame,
@@ -194,8 +204,7 @@ def _join_intermediates(
     parquet_files = sorted(intermediate_dir.glob("*.parquet"))
     if not parquet_files:
         raise FileNotFoundError(
-            f"No intermediate parquets found in {intermediate_dir}. "
-            "Run run_all_steps() first."
+            f"No intermediate parquets found in {intermediate_dir}. " "Run run_all_steps() first."
         )
 
     join_keys = ["season", "series_id"]
@@ -219,12 +228,14 @@ def _join_intermediates(
 
     logger.info(
         "_join_intermediates: %d rows, %d columns after all joins.",
-        len(result), len(result.columns),
+        len(result),
+        len(result.columns),
     )
     return result
 
 
 # ── Delta computation ──────────────────────────────────────────────────────────
+
 
 def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
     """Convert all *_high / *_low column pairs into delta_* columns.
@@ -245,7 +256,9 @@ def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     high_cols = [c for c in df.columns if c.endswith("_high")]
-    paired_bases = [c[: -len("_high")] for c in high_cols if c[: -len("_high")] + "_low" in df.columns]
+    paired_bases = [
+        c[: -len("_high")] for c in high_cols if c[: -len("_high")] + "_low" in df.columns
+    ]
 
     cols_to_drop: list[str] = []
     for base_name in paired_bases:
@@ -265,12 +278,14 @@ def compute_deltas(df: pd.DataFrame) -> pd.DataFrame:
     n_deltas = sum(1 for c in df.columns if c.startswith("delta_") or c == "top3_gp_pct_delta")
     logger.info(
         "compute_deltas: %d *_high/*_low pairs converted; %d delta features total.",
-        len(paired_bases), n_deltas,
+        len(paired_bases),
+        n_deltas,
     )
     return df
 
 
 # ── Public assembly entrypoint ────────────────────────────────────────────────
+
 
 def assemble_dataset(
     raw_dir: Path = RAW_DIR,
@@ -306,20 +321,26 @@ def assemble_dataset(
     # or columns never populated in the raw data (e.g. delta_seed when seeds are NaN).
     all_nan_cols = [c for c in final.columns if c.startswith("delta_") and final[c].isna().all()]
     if all_nan_cols:
-        logger.warning(
-            "Dropping %d all-NaN delta columns: %s", len(all_nan_cols), all_nan_cols
-        )
+        logger.warning("Dropping %d all-NaN delta columns: %s", len(all_nan_cols), all_nan_cols)
         final = final.drop(columns=all_nan_cols)
 
-    keep_meta = {"series_id", "year", "higher_seed_wins", "team_high", "team_low",
-                 "round", "conference"}
+    keep_meta = {
+        "series_id",
+        "year",
+        "higher_seed_wins",
+        "team_high",
+        "team_low",
+        "round",
+        "conference",
+    }
     feature_cols = [c for c in final.columns if c not in keep_meta]
     final = final[sorted(keep_meta & set(final.columns)) + sorted(feature_cols)]
 
     logger.info(
-        "assemble_dataset: final shape %d rows × %d cols  "
-        "(%d feature columns).",
-        len(final), len(final.columns), len(feature_cols),
+        "assemble_dataset: final shape %d rows × %d cols  " "(%d feature columns).",
+        len(final),
+        len(final.columns),
+        len(feature_cols),
     )
     return final
 
@@ -404,14 +425,14 @@ def build_team_season_features(
     available_tr = [f for f in tr_raw_features if f in team_stats.columns]
     if len(available_tr) < len(tr_raw_features):
         missing = set(tr_raw_features) - set(available_tr)
-        logger.warning(
-            "build_team_season_features: team_ratings columns not found: %s", missing
-        )
+        logger.warning("build_team_season_features: team_ratings columns not found: %s", missing)
     result = team_stats[["season", "team"] + available_tr].copy()
 
     # ── 2. Intermediates with _high/_low columns ───────────────────────────────
     # Use Round 1 rows so each team appears exactly once per season.
-    r1 = base[base["round"] == "first_round"][["series_id", "season", "team_high", "team_low"]].copy()
+    r1 = base[base["round"] == "first_round"][
+        ["series_id", "season", "team_high", "team_low"]
+    ].copy()
 
     intermediates_to_pivot = {
         "player_ratings": step_to_raw_features.get("player_ratings", []),
@@ -437,7 +458,8 @@ def build_team_season_features(
         if not found_raw:
             logger.warning(
                 "build_team_season_features: no *_high/*_low columns found for %s in %s",
-                raw_features, step_name,
+                raw_features,
+                step_name,
             )
             continue
 
@@ -446,18 +468,15 @@ def build_team_season_features(
         rename_high = {f"{f}_high": f for f in found_raw}
         rename_low = {f"{f}_low": f for f in found_raw}
 
-        high_df = (
-            merged[["season", "team_high"] + high_cols]
-            .rename(columns={"team_high": "team", **rename_high})
+        high_df = merged[["season", "team_high"] + high_cols].rename(
+            columns={"team_high": "team", **rename_high}
         )
-        low_df = (
-            merged[["season", "team_low"] + low_cols]
-            .rename(columns={"team_low": "team", **rename_low})
+        low_df = merged[["season", "team_low"] + low_cols].rename(
+            columns={"team_low": "team", **rename_low}
         )
 
-        combined = (
-            pd.concat([high_df, low_df], ignore_index=True)
-            .drop_duplicates(subset=["season", "team"], keep="first")
+        combined = pd.concat([high_df, low_df], ignore_index=True).drop_duplicates(
+            subset=["season", "team"], keep="first"
         )
 
         result = result.merge(combined, on=["season", "team"], how="left")
@@ -469,7 +488,9 @@ def build_team_season_features(
     result.to_parquet(out_path, index=False)
     logger.info(
         "build_team_season_features: %d rows × %d cols saved to %s",
-        len(result), len(result.columns), out_path,
+        len(result),
+        len(result.columns),
+        out_path,
     )
     return result
 

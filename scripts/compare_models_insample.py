@@ -45,6 +45,7 @@ VALIDATION_YEAR = 2025  # Sacred holdout — never touched
 
 # ── Data loading ───────────────────────────────────────────────────────────────
 
+
 def _load_windows() -> list[dict]:
     with open(ROOT / "configs" / "training_windows.yaml") as f:
         return yaml.safe_load(f)["windows"]
@@ -90,9 +91,7 @@ def _infer_conference_split(
 
     cf = rounds.get(3, [])
     if len(cf) != 2:
-        raise ValueError(
-            f"Year {year}: expected 2 conf_finals matchups, got {len(cf)}."
-        )
+        raise ValueError(f"Year {year}: expected 2 conf_finals matchups, got {len(cf)}.")
 
     def _collect_half(cf_series: dict) -> set[str]:
         """Trace backwards from one conf_finals to gather all 8 teams."""
@@ -116,8 +115,25 @@ def _infer_conference_split(
 
     # Resolve which half is East using historically East-aligned franchises
     _hist_east = {
-        "BOS", "NYK", "PHI", "DET", "CHI", "ATL", "MIL", "CLE", "IND", "MIA",
-        "ORL", "NJN", "WSB", "WAS", "CHA", "TOR", "BKN", "NJN", "BUF",
+        "BOS",
+        "NYK",
+        "PHI",
+        "DET",
+        "CHI",
+        "ATL",
+        "MIL",
+        "CLE",
+        "IND",
+        "MIA",
+        "ORL",
+        "NJN",
+        "WSB",
+        "WAS",
+        "CHA",
+        "TOR",
+        "BKN",
+        "NJN",
+        "BUF",
     }
     east1 = len(half1 & _hist_east)
     east2 = len(half2 & _hist_east)
@@ -221,6 +237,7 @@ def _actual_champion(year: int) -> str:
 
 # ── Simulation ─────────────────────────────────────────────────────────────────
 
+
 def _run_bracket_sim(
     year: int,
     east_seeds: list[str],
@@ -251,8 +268,7 @@ def _run_bracket_sim(
 
     # Pre-compute feature dicts to avoid repeated .loc + .to_dict() in the loop
     feat_cache: dict[str, dict] = {
-        t: (team_features.loc[t].to_dict() if t in team_features.index else {})
-        for t in all_teams
+        t: (team_features.loc[t].to_dict() if t in team_features.index else {}) for t in all_teams
     }
 
     # Pre-compute win probabilities for every possible matchup (deterministic)
@@ -274,9 +290,7 @@ def _run_bracket_sim(
         while True:
             for series in bracket.rounds[-1]:
                 p = _p(series.high_seed, series.low_seed)
-                series.winner = (
-                    series.high_seed if random_draws[draw_idx] < p else series.low_seed
-                )
+                series.winner = series.high_seed if random_draws[draw_idx] < p else series.low_seed
                 draw_idx += 1
 
             result = advance_bracket(bracket)
@@ -292,6 +306,7 @@ def _run_bracket_sim(
 
 # ── Artifact persistence ───────────────────────────────────────────────────────
 
+
 def _save_lmsf_spec(spec: dict, window: str) -> Path:
     """Serialize LM+SF model spec to results/model_selection/chosen_model_star_flag_{window}.json."""
     path = RESULTS_DIR / f"chosen_model_star_flag_{window}.json"
@@ -303,6 +318,7 @@ def _save_lmsf_spec(spec: dict, window: str) -> Path:
 
 # ── Table rendering ────────────────────────────────────────────────────────────
 
+
 def _print_table(
     window_name: str,
     start_year: int,
@@ -312,8 +328,10 @@ def _print_table(
     """Print one side-by-side comparison table for a training window."""
     W = 138
     print(f"\n{'=' * W}")
-    print(f"  WINDOW: {window_name.upper()}  ({start_year}-{end_year})   "
-          f"[{len(rows)} seasons, n_sims per season shown in header]")
+    print(
+        f"  WINDOW: {window_name.upper()}  ({start_year}-{end_year})   "
+        f"[{len(rows)} seasons, n_sims per season shown in header]"
+    )
     print(f"{'=' * W}")
 
     hdr = (
@@ -339,6 +357,7 @@ def _print_table(
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
+
 def main(n_sims: int = 5_000) -> None:
     """Fit both model variants on all three windows, run bracket sims, print tables."""
     print(f"\nLoading series dataset and team features…")
@@ -347,9 +366,9 @@ def main(n_sims: int = 5_000) -> None:
     windows = _load_windows()
 
     # Confirm no 2025 data is present in the loaded dataset
-    assert VALIDATION_YEAR not in series_df["year"].values, (
-        f"STOP: validation year {VALIDATION_YEAR} found in series_dataset — aborting."
-    )
+    assert (
+        VALIDATION_YEAR not in series_df["year"].values
+    ), f"STOP: validation year {VALIDATION_YEAR} found in series_dataset — aborting."
 
     all_window_rows: dict[str, list[dict]] = {}
 
@@ -380,11 +399,11 @@ def main(n_sims: int = 5_000) -> None:
         print(f"\n  [2/3] Saved LM+SF artifact -> {artifact_path.relative_to(ROOT)}")
 
         # ── Simulate every season in this window ───────────────────────────
-        season_years = sorted(
-            y for y in range(start_year, end_year + 1) if y != VALIDATION_YEAR
+        season_years = sorted(y for y in range(start_year, end_year + 1) if y != VALIDATION_YEAR)
+        print(
+            f"\n  [3/3] Running bracket simulations for {len(season_years)} seasons "
+            f"(n_sims={n_sims:,} each)…"
         )
-        print(f"\n  [3/3] Running bracket simulations for {len(season_years)} seasons "
-              f"(n_sims={n_sims:,} each)…")
 
         rng_lm = np.random.default_rng(42)
         rng_lmsf = np.random.default_rng(42)
@@ -428,16 +447,18 @@ def main(n_sims: int = 5_000) -> None:
             lm_winner = max(lm_probs, key=lm_probs.get)
             lmsf_winner = max(lmsf_probs, key=lmsf_probs.get)
 
-            table_rows.append({
-                "season": year,
-                "actual_champion": actual_champ,
-                "lm_winner": lm_winner,
-                "lm_pred_prob": lm_probs[lm_winner],
-                "lm_champ_prob": lm_probs.get(actual_champ, 0.0),
-                "lmsf_winner": lmsf_winner,
-                "lmsf_pred_prob": lmsf_probs[lmsf_winner],
-                "lmsf_champ_prob": lmsf_probs.get(actual_champ, 0.0),
-            })
+            table_rows.append(
+                {
+                    "season": year,
+                    "actual_champion": actual_champ,
+                    "lm_winner": lm_winner,
+                    "lm_pred_prob": lm_probs[lm_winner],
+                    "lm_champ_prob": lm_probs.get(actual_champ, 0.0),
+                    "lmsf_winner": lmsf_winner,
+                    "lmsf_pred_prob": lmsf_probs[lmsf_winner],
+                    "lmsf_champ_prob": lmsf_probs.get(actual_champ, 0.0),
+                }
+            )
 
             if (idx + 1) % 10 == 0 or (idx + 1) == len(season_years):
                 print(f"    {idx + 1}/{len(season_years)} seasons done…")
@@ -455,9 +476,9 @@ def main(n_sims: int = 5_000) -> None:
     for wname, rows in all_window_rows.items():
         disagreements = [r for r in rows if r["lm_winner"] != r["lmsf_winner"]]
         neither_correct = [
-            r for r in rows
-            if r["lm_winner"] != r["actual_champion"]
-            and r["lmsf_winner"] != r["actual_champion"]
+            r
+            for r in rows
+            if r["lm_winner"] != r["actual_champion"] and r["lmsf_winner"] != r["actual_champion"]
         ]
 
         print(f"\nWindow: {wname.upper()}")
@@ -472,7 +493,9 @@ def main(n_sims: int = 5_000) -> None:
         else:
             print("    (none)")
 
-        print(f"\n  Seasons where NEITHER model predicted the actual champion  ({len(neither_correct)}):")
+        print(
+            f"\n  Seasons where NEITHER model predicted the actual champion  ({len(neither_correct)}):"
+        )
         if neither_correct:
             for r in neither_correct:
                 print(

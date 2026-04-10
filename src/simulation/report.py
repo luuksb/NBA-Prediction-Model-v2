@@ -58,7 +58,9 @@ def save_simulation_report(
         "n_sims": aggregated["n_sims"],
         "predicted_champion": aggregated["most_common_champion"],
         "actual_champion": actual_champion,
-        "most_common_finals": list(aggregated["most_common_finals"]) if aggregated["most_common_finals"] else None,
+        "most_common_finals": list(aggregated["most_common_finals"])
+        if aggregated["most_common_finals"]
+        else None,
         "championship_prob": aggregated["championship_prob"],
     }
     summary_path = out_dir / "summary.json"

@@ -126,15 +126,17 @@ def run_simulations(
                     else:
                         finalist_west_injuries = n_injured
 
-        outcomes.append({
-            "iteration": i,
-            "champion": champion,
-            "finalist_east": finals_series.high_seed if finals_series else None,
-            "finalist_west": finals_series.low_seed if finals_series else None,
-            "finalist_east_injuries": finalist_east_injuries,
-            "finalist_west_injuries": finalist_west_injuries,
-            "round_exits": round_exits,
-        })
+        outcomes.append(
+            {
+                "iteration": i,
+                "champion": champion,
+                "finalist_east": finals_series.high_seed if finals_series else None,
+                "finalist_west": finals_series.low_seed if finals_series else None,
+                "finalist_east_injuries": finalist_east_injuries,
+                "finalist_west_injuries": finalist_west_injuries,
+                "round_exits": round_exits,
+            }
+        )
 
         if (i + 1) % 10_000 == 0:
             logger.info("Completed %d / %d simulations…", i + 1, n_sims)

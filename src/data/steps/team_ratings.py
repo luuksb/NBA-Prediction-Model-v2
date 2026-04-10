@@ -34,10 +34,20 @@ SUMMARIES_CSV = RAW_DIR / "Team Summaries.csv"
 
 # Columns that are metadata / identifiers — excluded from delta features
 _META_COLS = frozenset(
-    ["season", "lg", "team", "abbreviation", "playoffs",
-     "g", "mp",                         # games / minutes (per-100 file)
-     "pw", "pl",                         # pythagorean wins/losses
-     "arena", "attend", "attend_g"]      # attendance / arena
+    [
+        "season",
+        "lg",
+        "team",
+        "abbreviation",
+        "playoffs",
+        "g",
+        "mp",  # games / minutes (per-100 file)
+        "pw",
+        "pl",  # pythagorean wins/losses
+        "arena",
+        "attend",
+        "attend_g",
+    ]  # attendance / arena
 )
 
 # Warn if any raw column exceeds this missing-value rate before delta computation
@@ -57,11 +67,7 @@ def _load_per100_stats(seasons: list[int]) -> pd.DataFrame:
         DataFrame with columns: season, abbreviation + all numeric stat columns.
     """
     df = pd.read_csv(PER100_CSV)
-    df = df[
-        (df["lg"] == "NBA")
-        & (df["playoffs"] == True)
-        & (df["season"].isin(seasons))
-    ].copy()
+    df = df[(df["lg"] == "NBA") & (df["playoffs"] == True) & (df["season"].isin(seasons))].copy()
 
     stat_cols = [c for c in df.columns if c not in _META_COLS]
     for col in stat_cols:
@@ -80,11 +86,7 @@ def _load_summary_stats(seasons: list[int]) -> pd.DataFrame:
         DataFrame with columns: season, abbreviation + all numeric stat columns.
     """
     df = pd.read_csv(SUMMARIES_CSV)
-    df = df[
-        (df["lg"] == "NBA")
-        & (df["playoffs"] == True)
-        & (df["season"].isin(seasons))
-    ].copy()
+    df = df[(df["lg"] == "NBA") & (df["playoffs"] == True) & (df["season"].isin(seasons))].copy()
 
     stat_cols = [c for c in df.columns if c not in _META_COLS]
     for col in stat_cols:
@@ -115,7 +117,9 @@ def _check_missingness(df: pd.DataFrame, stat_cols: list[str], label: str) -> No
         if rate > 0:
             logger.warning(
                 "team_ratings: %s column '%s' has %.1f%% missing values",
-                label, col, rate * 100,
+                label,
+                col,
+                rate * 100,
             )
 
 
@@ -165,7 +169,9 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
     seasons = sorted(df["season"].unique().tolist())
     logger.info(
         "team_ratings: loading stats for %d seasons (%d–%d)",
-        len(seasons), seasons[0], seasons[-1],
+        len(seasons),
+        seasons[0],
+        seasons[-1],
     )
 
     per100 = _load_per100_stats(seasons)
@@ -241,6 +247,7 @@ def run(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info(
         "team_ratings: added %d delta columns to %d series rows",
-        len(all_stat_cols), len(df),
+        len(all_stat_cols),
+        len(df),
     )
     return df

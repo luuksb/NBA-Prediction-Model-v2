@@ -49,9 +49,7 @@ def _normalize_name(name: str) -> str:
         Normalized string, e.g. "nikola_jokic" or "de_aaron_fox".
     """
     ascii_name = (
-        unicodedata.normalize("NFKD", str(name))
-        .encode("ascii", errors="ignore")
-        .decode("ascii")
+        unicodedata.normalize("NFKD", str(name)).encode("ascii", errors="ignore").decode("ascii")
     )
     norm = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
     return _SUFFIX_PAT.sub("", norm)
@@ -123,9 +121,9 @@ def main() -> None:
     n_teams = len(teams_sorted)
     team_idx_map = {t: idx for idx, t in enumerate(teams_sorted)}
 
-    avail_lookup: dict[str, float] = (
-        availability_rates.set_index("player_name_norm")["availability_rate"].to_dict()
-    )
+    avail_lookup: dict[str, float] = availability_rates.set_index("player_name_norm")[
+        "availability_rate"
+    ].to_dict()
 
     player_bpm: list[list[float]] = [[0.0] * N_STARS for _ in range(n_teams)]
     mean_rates: list[list[float]] = [[0.85] * N_STARS for _ in range(n_teams)]
@@ -141,7 +139,9 @@ def main() -> None:
             row = top3.iloc[star_i]
             raw_bpm = pd.to_numeric(row.get("bpm", 0.0), errors="coerce")
             player_bpm[t][star_i] = float(raw_bpm) if pd.notna(raw_bpm) else 0.0
-            mean_rates[t][star_i] = min(float(avail_lookup.get(row["player_name_norm"], 0.85)), 0.99)
+            mean_rates[t][star_i] = min(
+                float(avail_lookup.get(row["player_name_norm"], 0.85)), 0.99
+            )
 
     draws = rng.uniform(size=(n_teams, N_STARS, N_ROUNDS, args.n_draws))
     meta: dict = {

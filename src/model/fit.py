@@ -110,8 +110,12 @@ def fit_all(
     windows = _load_windows()
     results = []
     total = len(candidate_feature_sets) * len(windows)
-    logger.info("Fitting %d models (%d feature sets × %d windows)…",
-                total, len(candidate_feature_sets), len(windows))
+    logger.info(
+        "Fitting %d models (%d feature sets × %d windows)…",
+        total,
+        len(candidate_feature_sets),
+        len(windows),
+    )
 
     for features in candidate_feature_sets:
         for w in windows:

@@ -153,8 +153,12 @@ def _load_coach_team_year() -> pd.DataFrame:
         return pd.DataFrame(columns=["season", "team_abbr", "coach_key"])
 
     df = pd.DataFrame(rows).drop_duplicates(subset=["season", "team_abbr"])
-    logger.info("Loaded coach-team-year table: %d rows (seasons %d-%d)",
-                len(df), df["season"].min(), df["season"].max())
+    logger.info(
+        "Loaded coach-team-year table: %d rows (seasons %d-%d)",
+        len(df),
+        df["season"].min(),
+        df["season"].max(),
+    )
     return df
 
 
@@ -175,9 +179,7 @@ def _load_all_series(up_to_season: int) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def _build_coach_record_table(
-    coach_team: pd.DataFrame, max_season: int
-) -> pd.DataFrame:
+def _build_coach_record_table(coach_team: pd.DataFrame, max_season: int) -> pd.DataFrame:
     """Accumulate series wins/losses per coach_key across all prior seasons.
 
     Args:
@@ -210,8 +212,7 @@ def _build_coach_record_table(
     # Attach coach key to each series
     coach_lookup = coach_team.set_index(["season", "team_abbr"])["coach_key"].to_dict()
     team_series["coach_key"] = [
-        coach_lookup.get((row.season, row.team_abbr))
-        for row in team_series.itertuples()
+        coach_lookup.get((row.season, row.team_abbr)) for row in team_series.itertuples()
     ]
     team_series = team_series.dropna(subset=["coach_key"])
 

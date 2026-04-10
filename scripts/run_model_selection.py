@@ -66,12 +66,15 @@ def main() -> None:
         results_dir.mkdir(parents=True, exist_ok=True)
 
         for window_name, metrics in leaderboards.items():
-            bic_lb = metrics["bic"]   # BIC leaderboard for this window (lower = better)
+            bic_lb = metrics["bic"]  # BIC leaderboard for this window (lower = better)
             top_features = bic_lb.iloc[0]["features"]
             window_meta = next(w for w in windows_cfg["windows"] if w["name"] == window_name)
             spec = fit.fit_logit(
-                df, top_features, window_name,
-                window_meta["start_year"], window_meta["end_year"],
+                df,
+                top_features,
+                window_name,
+                window_meta["start_year"],
+                window_meta["end_year"],
             )
             out_path = results_dir / f"chosen_model_{window_name}.json"
             with open(out_path, "w") as f:

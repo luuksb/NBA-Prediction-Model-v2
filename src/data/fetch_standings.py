@@ -4,6 +4,7 @@ Writes results to configs/bracket_seeds.yaml. Run directly:
 
     python src/data/fetch_standings.py
 """
+
 from __future__ import annotations
 
 import time
@@ -83,6 +84,7 @@ def team_abbr(team_id: int, season_year: int) -> str:
 # Season string helpers
 # ---------------------------------------------------------------------------
 
+
 def season_str(year: int) -> str:
     """Convert season end-year to NBA API format, e.g. 2016 → '2015-16'."""
     return f"{year - 1}-{str(year)[-2:]}"
@@ -105,14 +107,9 @@ def fetch_seeds_for_year(year: int) -> dict[str, list[str]]:
 
     result: dict[str, list[str]] = {}
     for conf in ("East", "West"):
-        conf_df = (
-            df[df["Conference"] == conf]
-            .sort_values("PlayoffRank")
-            .head(8)
-        )
+        conf_df = df[df["Conference"] == conf].sort_values("PlayoffRank").head(8)
         result[conf.lower()] = [
-            team_abbr(int(row["TeamID"]), year)
-            for _, row in conf_df.iterrows()
+            team_abbr(int(row["TeamID"]), year) for _, row in conf_df.iterrows()
         ]
     return result
 
@@ -177,6 +174,7 @@ def write_yaml(all_seeds: dict[int, dict[str, list[str]]], path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]

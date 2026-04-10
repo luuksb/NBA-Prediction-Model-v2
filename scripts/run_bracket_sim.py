@@ -35,7 +35,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run NBA playoff bracket simulation.")
     parser.add_argument("--year", type=int, required=True, help="Season year to simulate.")
     parser.add_argument("--window", required=True, help="Training window name (e.g. 'modern').")
-    parser.add_argument("--n-sims", type=int, default=50_000, help="Number of Monte Carlo iterations.")
+    parser.add_argument(
+        "--n-sims", type=int, default=50_000, help="Number of Monte Carlo iterations."
+    )
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility.")
     parser.add_argument("--no-injury", action="store_true", help="Disable injury adjustment.")
     return parser.parse_args()
@@ -112,6 +114,7 @@ def load_bracket_seeds(year: int) -> tuple[list[str], list[str]]:
 
     # Try seed columns first
     if pd.notna(r1["seed_high"]).all() and pd.notna(r1["seed_low"]).all():
+
         def _extract_seeds_from_cols(conf_df: pd.DataFrame) -> list[str]:
             seed_map: dict[int, str] = {}
             for _, row in conf_df.iterrows():
@@ -134,10 +137,9 @@ def load_bracket_seeds(year: int) -> tuple[list[str], list[str]]:
             return sorted(teams, key=lambda t: (-year_wins.get(t, 0), t))
 
         def _extract_seeds_by_wins(conf_df: pd.DataFrame) -> list[str]:
-            teams = (
-                [str(r["team_high"]) for _, r in conf_df.iterrows()]
-                + [str(r["team_low"]) for _, r in conf_df.iterrows()]
-            )
+            teams = [str(r["team_high"]) for _, r in conf_df.iterrows()] + [
+                str(r["team_low"]) for _, r in conf_df.iterrows()
+            ]
             if len(teams) != 8:
                 raise ValueError(
                     f"Expected 8 teams for conference in {year}, got {len(teams)}: {teams}"
@@ -199,7 +201,9 @@ def load_injury_draws(year: int, n_sims: int, seed: int | None) -> dict:
 
     logger.info(
         "Loaded injury draws for %d teams (year=%d, shape=%s)",
-        len(meta["teams"]), year, draws.shape,
+        len(meta["teams"]),
+        year,
+        draws.shape,
     )
     return {
         "draws": draws,
@@ -219,7 +223,9 @@ def main() -> None:
     # Load team features
     logger.info("Loading team features for year %d…", args.year)
     team_features = load_team_features(args.year)
-    logger.info("Team features: %d teams, %d features", len(team_features), len(team_features.columns))
+    logger.info(
+        "Team features: %d teams, %d features", len(team_features), len(team_features.columns)
+    )
 
     # Load bracket seeds
     logger.info("Loading bracket seeds for year %d…", args.year)

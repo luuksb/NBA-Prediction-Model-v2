@@ -17,6 +17,7 @@ import pandas as pd
 # Logit win probability
 # ---------------------------------------------------------------------------
 
+
 def compute_win_prob(
     high_abbrev: str,
     low_abbrev: str,
@@ -52,6 +53,7 @@ def compute_win_prob(
 # ---------------------------------------------------------------------------
 # Low-level helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_adv_prob(abbrev: str, round_num: int, adv_df: pd.DataFrame) -> float:
     """Look up advancement probability for a team in a given round.
@@ -97,6 +99,7 @@ def _cond_win_prob(abbrev: str, round_num: int, adv_df: pd.DataFrame) -> float:
 # TeamNode builder
 # ---------------------------------------------------------------------------
 
+
 def _build_team_node(
     abbrev: str,
     seed: int,
@@ -134,6 +137,7 @@ def _build_team_node(
 # ---------------------------------------------------------------------------
 # Round builders
 # ---------------------------------------------------------------------------
+
 
 def _build_r1_matchups(
     seeds: list[str],
@@ -237,11 +241,15 @@ def _build_r2_matchups(
     matchups = []
     for g_a, g_b in slot_groups:
         teams_a = [g_a["high"]["abbrev"], g_a["low"]["abbrev"]]
-        seeds_a = {g_a["high"]["abbrev"]: g_a["high"]["seed"],
-                   g_a["low"]["abbrev"]: g_a["low"]["seed"]}
+        seeds_a = {
+            g_a["high"]["abbrev"]: g_a["high"]["seed"],
+            g_a["low"]["abbrev"]: g_a["low"]["seed"],
+        }
         teams_b = [g_b["high"]["abbrev"], g_b["low"]["abbrev"]]
-        seeds_b = {g_b["high"]["abbrev"]: g_b["high"]["seed"],
-                   g_b["low"]["abbrev"]: g_b["low"]["seed"]}
+        seeds_b = {
+            g_b["high"]["abbrev"]: g_b["high"]["seed"],
+            g_b["low"]["abbrev"]: g_b["low"]["seed"],
+        }
 
         rep_a = _pick_rep(teams_a, seeds_a, conference, 2, adv_df, logo_url_fn)
         rep_b = _pick_rep(teams_b, seeds_b, conference, 2, adv_df, logo_url_fn)
@@ -337,11 +345,15 @@ def _build_finals_matchup(
         Nodes carry conference='east'/'west' from their source.
     """
     east_candidates = [east_r3["high"]["abbrev"], east_r3["low"]["abbrev"]]
-    east_seeds = {east_r3["high"]["abbrev"]: east_r3["high"]["seed"],
-                  east_r3["low"]["abbrev"]: east_r3["low"]["seed"]}
+    east_seeds = {
+        east_r3["high"]["abbrev"]: east_r3["high"]["seed"],
+        east_r3["low"]["abbrev"]: east_r3["low"]["seed"],
+    }
     west_candidates = [west_r3["high"]["abbrev"], west_r3["low"]["abbrev"]]
-    west_seeds = {west_r3["high"]["abbrev"]: west_r3["high"]["seed"],
-                  west_r3["low"]["abbrev"]: west_r3["low"]["seed"]}
+    west_seeds = {
+        west_r3["high"]["abbrev"]: west_r3["high"]["seed"],
+        west_r3["low"]["abbrev"]: west_r3["low"]["seed"],
+    }
 
     east_rep = _pick_rep(east_candidates, east_seeds, "east", 4, adv_df, logo_url_fn)
     west_rep = _pick_rep(west_candidates, west_seeds, "west", 4, adv_df, logo_url_fn)
@@ -358,7 +370,11 @@ def _build_finals_matchup(
         hi, lo = (east_rep, west_rep) if east_w >= west_w else (west_rep, east_rep)
     else:
         # Fallback: higher R4 advancement probability
-        hi, lo = (east_rep, west_rep) if east_rep["adv_prob"] >= west_rep["adv_prob"] else (west_rep, east_rep)
+        hi, lo = (
+            (east_rep, west_rep)
+            if east_rep["adv_prob"] >= west_rep["adv_prob"]
+            else (west_rep, east_rep)
+        )
 
     if team_features is not None and spec is not None:
         p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
@@ -371,6 +387,7 @@ def _build_finals_matchup(
 # ---------------------------------------------------------------------------
 # Top-level public functions
 # ---------------------------------------------------------------------------
+
 
 def build_bracket_structure(
     east_seeds: list[str],
@@ -482,15 +499,17 @@ def get_upsets(
                 lo_prob = 1.0 - compute_win_prob(hi, lo, team_features, spec)
             else:
                 lo_prob = _cond_win_prob(lo, 1, adv_df)
-            upsets.append({
-                "matchup": f"{conf}: #{hi_idx + 1} {hi} vs #{lo_idx + 1} {lo}",
-                "underdog": lo,
-                "underdog_seed": lo_idx + 1,
-                "favourite": hi,
-                "favourite_seed": hi_idx + 1,
-                "cond_win_prob": lo_prob,
-                "round": 1,
-            })
+            upsets.append(
+                {
+                    "matchup": f"{conf}: #{hi_idx + 1} {hi} vs #{lo_idx + 1} {lo}",
+                    "underdog": lo,
+                    "underdog_seed": lo_idx + 1,
+                    "favourite": hi,
+                    "favourite_seed": hi_idx + 1,
+                    "cond_win_prob": lo_prob,
+                    "round": 1,
+                }
+            )
 
     # Rounds 2–4: derive matchups from advancement probs
     # Build representative bracket to find round 2–4 matchups
@@ -515,14 +534,16 @@ def get_upsets(
         lo = matchup["low"]
         lo_prob = lo["cond_win_prob"]
         if lo_prob > upset_threshold:
-            upsets.append({
-                "matchup": f"{label}: #{hi['seed']} {hi['abbrev']} vs #{lo['seed']} {lo['abbrev']}",
-                "underdog": lo["abbrev"],
-                "underdog_seed": lo["seed"],
-                "favourite": hi["abbrev"],
-                "favourite_seed": hi["seed"],
-                "cond_win_prob": lo_prob,
-                "round": rnd,
-            })
+            upsets.append(
+                {
+                    "matchup": f"{label}: #{hi['seed']} {hi['abbrev']} vs #{lo['seed']} {lo['abbrev']}",
+                    "underdog": lo["abbrev"],
+                    "underdog_seed": lo["seed"],
+                    "favourite": hi["abbrev"],
+                    "favourite_seed": hi["seed"],
+                    "cond_win_prob": lo_prob,
+                    "round": rnd,
+                }
+            )
 
     return sorted(upsets, key=lambda u: u["cond_win_prob"])

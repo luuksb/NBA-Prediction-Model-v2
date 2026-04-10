@@ -45,10 +45,7 @@ def list_available_runs() -> list[str]:
     if not results_dir.exists():
         return []
 
-    runs = [
-        p.parent.name
-        for p in results_dir.glob("*/summary.json")
-    ]
+    runs = [p.parent.name for p in results_dir.glob("*/summary.json")]
 
     def _sort_key(run_id: str) -> tuple[int, str]:
         parts = run_id.split("_", 1)

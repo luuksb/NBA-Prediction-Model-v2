@@ -95,7 +95,9 @@ def simulate_team_availability(
         rng = np.random.default_rng()
 
     merged = top_players.merge(availability_rates, on=player_col, how="left")
-    merged["availability_rate"] = merged["availability_rate"].fillna(0.85)  # league average fallback
+    merged["availability_rate"] = merged["availability_rate"].fillna(
+        0.85
+    )  # league average fallback
     weights = merged[rating_col].clip(lower=0.0)
     total_weight = weights.sum()
     if total_weight == 0:

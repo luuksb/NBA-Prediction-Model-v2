@@ -39,9 +39,23 @@ logger = logging.getLogger(__name__)
 YEAR = 2025
 PLAYOFF_TEAMS = [
     # East
-    "CLE", "BOS", "NYK", "IND", "MIL", "DET", "ORL", "MIA",
+    "CLE",
+    "BOS",
+    "NYK",
+    "IND",
+    "MIL",
+    "DET",
+    "ORL",
+    "MIA",
     # West
-    "OKC", "HOU", "LAL", "DEN", "LAC", "MIN", "GSW", "MEM",
+    "OKC",
+    "HOU",
+    "LAL",
+    "DEN",
+    "LAC",
+    "MIN",
+    "GSW",
+    "MEM",
 ]
 FINAL_DIR = Path("data/final")
 
@@ -85,7 +99,9 @@ def build_player_features(year: int, teams: list[str]) -> pd.DataFrame:
 
     logger.info(
         "player_features: top-%d ranking complete; %d superstar entries for %d",
-        n, len(superstar_set), year,
+        n,
+        len(superstar_set),
+        year,
     )
 
     rows: list[dict] = []
@@ -99,23 +115,27 @@ def build_player_features(year: int, teams: list[str]) -> pd.DataFrame:
         for _, row in team_top.iterrows():
             bpm = float(row["bpm"]) if not pd.isna(row["bpm"]) else 0.0
             per = float(row["per"]) if not pd.isna(row["per"]) else 0.0
-            bpm_sum += bpm   # avail = 1.0
+            bpm_sum += bpm  # avail = 1.0
             per_sum += per
 
             # star_flag: 1.0 × avail if any top-N player is a superstar
             if star_flag == 0.0 and (year, row["player_norm"]) in superstar_set:
                 star_flag = 1.0  # avail = 1.0
 
-        rows.append({
-            "year": year,
-            "team": team,
-            "bpm_avail_sum": bpm_sum,
-            "per_avail_sum": per_sum,
-            "star_flag": star_flag,
-        })
+        rows.append(
+            {
+                "year": year,
+                "team": team,
+                "bpm_avail_sum": bpm_sum,
+                "per_avail_sum": per_sum,
+                "star_flag": star_flag,
+            }
+        )
         logger.info(
             "  %-4s  bpm_avail_sum=%.2f  star_flag=%.1f",
-            team, bpm_sum, star_flag,
+            team,
+            bpm_sum,
+            star_flag,
         )
 
     return pd.DataFrame(rows)
@@ -134,9 +154,7 @@ def build_experience_features(year: int, teams: list[str]) -> pd.DataFrame:
     exp = pe_mod._build_roster_experience_table(year)
     if exp.empty:
         logger.warning("No playoff experience data found; filling zeros.")
-        return pd.DataFrame(
-            [{"year": year, "team": t, "playoff_series_wins": 0.0} for t in teams]
-        )
+        return pd.DataFrame([{"year": year, "team": t, "playoff_series_wins": 0.0} for t in teams])
 
     exp_year = exp[exp["season"] == year].set_index("team")
 
@@ -169,9 +187,7 @@ def build_coach_features(year: int, teams: list[str]) -> pd.DataFrame:
         rows: list[dict] = []
         for team in teams:
             wins = (
-                float(cr_year.at[team, "coach_series_wins_cum"])
-                if team in cr_year.index
-                else 0.0
+                float(cr_year.at[team, "coach_series_wins_cum"]) if team in cr_year.index else 0.0
             )
             rows.append({"year": year, "team": team, "coach_series_wins_cum": wins})
         return pd.DataFrame(rows)
@@ -215,7 +231,8 @@ def main() -> None:
 
     logger.info(
         "2025 features: %d teams × %d columns",
-        len(features_2025), len(features_2025.columns),
+        len(features_2025),
+        len(features_2025.columns),
     )
 
     # Align columns with existing table (fill missing with NaN)
@@ -232,7 +249,8 @@ def main() -> None:
     updated.to_parquet(tsf_path, index=False)
     logger.info(
         "Saved updated team_season_features.parquet: %d rows (%d years)",
-        len(updated), updated["year"].nunique(),
+        len(updated),
+        updated["year"].nunique(),
     )
     logger.info(
         "2025 teams in file: %s",

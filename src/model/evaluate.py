@@ -42,7 +42,9 @@ def mcfadden_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     y_pred = np.clip(y_pred, eps, 1 - eps)
     ll_model = np.sum(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
     base_rate = np.mean(y_true)
-    ll_null = len(y_true) * (base_rate * np.log(base_rate) + (1 - base_rate) * np.log(1 - base_rate))
+    ll_null = len(y_true) * (
+        base_rate * np.log(base_rate) + (1 - base_rate) * np.log(1 - base_rate)
+    )
     return float(1.0 - ll_model / ll_null)
 
 
@@ -136,8 +138,12 @@ def build_leaderboard(
             metrics = evaluate_model(spec, df)
             rows.append(metrics)
         except Exception as exc:
-            logger.warning("Could not evaluate spec features=%s window=%s: %s",
-                           spec["features"], spec["window"], exc)
+            logger.warning(
+                "Could not evaluate spec features=%s window=%s: %s",
+                spec["features"],
+                spec["window"],
+                exc,
+            )
 
     leaderboard = pd.DataFrame(rows)
 

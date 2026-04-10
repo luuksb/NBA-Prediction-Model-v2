@@ -51,9 +51,9 @@ _MAX_CONVERGENCE_FAILURE_RATE = 0.20
 
 _METRIC_LABELS: dict[str, str] = {
     "mcfadden_r2": "McFadden Pseudo R²",
-    "brier_score":  "Brier Score       ",
-    "auc_roc":      "AUC-ROC           ",
-    "bic":          "BIC               ",
+    "brier_score": "Brier Score       ",
+    "auc_roc": "AUC-ROC           ",
+    "bic": "BIC               ",
 }
 
 
@@ -83,9 +83,7 @@ def load_chosen_model() -> ModelSpec:
         FileNotFoundError: If chosen_model.json does not exist.
     """
     if not CHOSEN_MODEL_PATH.exists():
-        raise FileNotFoundError(
-            f"{CHOSEN_MODEL_PATH} not found. Run model selection first."
-        )
+        raise FileNotFoundError(f"{CHOSEN_MODEL_PATH} not found. Run model selection first.")
     with open(CHOSEN_MODEL_PATH) as f:
         return json.load(f)
 
@@ -126,8 +124,7 @@ def print_leaderboards(leaderboards: dict[str, dict[str, pd.DataFrame]]) -> None
             windows_cfg = yaml.safe_load(f)["windows"]
         win_meta = next((w for w in windows_cfg if w["name"] == window), {})
         year_range = (
-            f"{win_meta.get('start_year', '?')}-{win_meta.get('end_year', '?')}"
-            if win_meta else ""
+            f"{win_meta.get('start_year', '?')}-{win_meta.get('end_year', '?')}" if win_meta else ""
         )
         print(f"\n{sep}")
         print(f"  WINDOW: {window.upper()}  ({year_range})")
@@ -191,10 +188,13 @@ def run_combinatorial_pipeline(
         logger.warning(
             "Excluding %d active feature(s) not present in the dataset "
             "(producing module may not have run yet): %s",
-            len(missing), missing,
+            len(missing),
+            missing,
         )
-        print(f"\n[WARN] {len(missing)} active feature(s) absent from dataset "
-              f"(skipped): {missing}")
+        print(
+            f"\n[WARN] {len(missing)} active feature(s) absent from dataset "
+            f"(skipped): {missing}"
+        )
     active = [f for f in active_cfg if f in df.columns]
     print(f"\n[OK] Step 1 -- Active features ({len(active)} usable):")
     for feat in active:
@@ -203,9 +203,7 @@ def run_combinatorial_pipeline(
     # ── Step 2: Generate combinations, apply forbidden-pair filter, stop check ──
     n = len(active)
     raw_combos = sum(comb(n, k) for k in range(min_size, min(max_size, n) + 1))
-    logger.info(
-        "Raw combination count: C(%d, %d..%d) = %d", n, min_size, max_size, raw_combos
-    )
+    logger.info("Raw combination count: C(%d, %d..%d) = %d", n, min_size, max_size, raw_combos)
 
     candidate_sets = generate_all_subsets(active, max_size=max_size, min_size=min_size)
     forbidden_pairs = get_forbidden_pairs()
@@ -214,7 +212,8 @@ def run_combinatorial_pipeline(
     excluded = raw_combos - total_combos
     logger.info(
         "After forbidden-pair filtering: %d valid combinations (%d excluded).",
-        total_combos, excluded,
+        total_combos,
+        excluded,
     )
 
     if total_combos > _MAX_COMBINATIONS:
@@ -245,14 +244,17 @@ def run_combinatorial_pipeline(
                 f"({w['start_year']}-{w['end_year']}) has only {n_series} series "
                 f"(minimum required: {_MIN_WINDOW_SERIES})."
             )
-        logger.info("Window '%s' (%d–%d): %d series.",
-                    w["name"], w["start_year"], w["end_year"], n_series)
+        logger.info(
+            "Window '%s' (%d–%d): %d series.", w["name"], w["start_year"], w["end_year"], n_series
+        )
 
     # ── Step 3: Fit all combinations × windows ────────────────────────────────
     total_fits = len(candidate_sets) * len(windows)
     logger.info(
         "Fitting %d models (%d combos × %d windows)…",
-        total_fits, len(candidate_sets), len(windows),
+        total_fits,
+        len(candidate_sets),
+        len(windows),
     )
 
     metric_rows: list[dict] = []
@@ -265,24 +267,19 @@ def run_combinatorial_pipeline(
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 try:
-                    spec = fit_logit(
-                        df, features, w["name"], w["start_year"], w["end_year"]
-                    )
+                    spec = fit_logit(df, features, w["name"], w["start_year"], w["end_year"])
                     if any(issubclass(c.category, ConvergenceWarning) for c in caught):
                         convergence_failures += 1
                         logger.debug(
                             "Convergence warning: features=%s window=%s",
-                            features, w["name"],
+                            features,
+                            w["name"],
                         )
-                    window_df = df[
-                        (df["year"] >= w["start_year"]) & (df["year"] <= w["end_year"])
-                    ]
+                    window_df = df[(df["year"] >= w["start_year"]) & (df["year"] <= w["end_year"])]
                     metric_rows.append(evaluate_model(spec, window_df))
                 except Exception as exc:
                     convergence_failures += 1
-                    logger.warning(
-                        "Skipped features=%s window=%s: %s", features, w["name"], exc
-                    )
+                    logger.warning("Skipped features=%s window=%s: %s", features, w["name"], exc)
 
     # ── Check convergence failure rate ────────────────────────────────────────
     failure_rate = convergence_failures / fit_attempts if fit_attempts else 0.0
@@ -296,7 +293,9 @@ def run_combinatorial_pipeline(
 
     logger.info(
         "Fitting complete: %d successful, %d skipped/failed (%.1f%%).",
-        len(metric_rows), convergence_failures, failure_rate * 100,
+        len(metric_rows),
+        convergence_failures,
+        failure_rate * 100,
     )
 
     # ── Steps 4 & 5: Build and print leaderboards ─────────────────────────────

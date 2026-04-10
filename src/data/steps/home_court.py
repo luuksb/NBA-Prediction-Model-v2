@@ -31,7 +31,5 @@ def run(base: pd.DataFrame) -> pd.DataFrame:
         1 for all normal seasons; 0 for neutral-site seasons (2020 bubble).
     """
     df = base.copy()
-    df["delta_home_court_advantage"] = (
-        ~df["season"].isin(NEUTRAL_SITE_SEASONS)
-    ).astype(int)
+    df["delta_home_court_advantage"] = (~df["season"].isin(NEUTRAL_SITE_SEASONS)).astype(int)
     return df

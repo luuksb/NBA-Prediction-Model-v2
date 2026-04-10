@@ -49,9 +49,7 @@ def aggregate_outcomes(outcomes: list[dict], all_teams: list[str]) -> dict:
                     round_reached[team][r] += 1
 
     championship_prob = {t: champ_counts[t] / n for t in all_teams}
-    round_advancement = {
-        t: {r: round_reached[t][r] / n for r in range(1, 5)} for t in all_teams
-    }
+    round_advancement = {t: {r: round_reached[t][r] / n for r in range(1, 5)} for t in all_teams}
     most_common_champion = champ_counts.most_common(1)[0][0] if champ_counts else None
     most_common_finals = finals_counts.most_common(1)[0][0] if finals_counts else None
 

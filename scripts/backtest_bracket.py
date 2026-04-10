@@ -87,13 +87,16 @@ def load_bracket_seeds(year: int) -> tuple[list[str], list[str]]:
 
     # If conference labels are available, use them directly
     if set(r1["conference"].unique()) <= {"east", "west"}:
+
         def _conf_teams(conf: str) -> list[str]:
             rows = r1[r1["conference"] == conf]
-            teams = [str(r["team_high"]) for _, r in rows.iterrows()] + \
-                    [str(r["team_low"]) for _, r in rows.iterrows()]
+            teams = [str(r["team_high"]) for _, r in rows.iterrows()] + [
+                str(r["team_low"]) for _, r in rows.iterrows()
+            ]
             if len(teams) != 8:
                 raise ValueError(f"Expected 8 teams for '{conf}', got {len(teams)}: {teams}")
             return _sort_by_wins(teams)
+
         return _conf_teams("east"), _conf_teams("west")
 
     # Unknown conference labels — infer two groups via transitive closure on pre-Finals series
@@ -122,9 +125,7 @@ def load_bracket_seeds(year: int) -> tuple[list[str], list[str]]:
         groups.append(group)
 
     if len(groups) != 2:
-        raise ValueError(
-            f"Expected 2 conference groups for {year}, found {len(groups)}: {groups}"
-        )
+        raise ValueError(f"Expected 2 conference groups for {year}, found {len(groups)}: {groups}")
 
     group_a = _sort_by_wins(list(groups[0]))
     group_b = _sort_by_wins(list(groups[1]))
@@ -212,14 +213,20 @@ def run_year(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Backtest bracket simulation over historical years.")
+    parser = argparse.ArgumentParser(
+        description="Backtest bracket simulation over historical years."
+    )
     parser.add_argument("--window", required=True, help="Training window: full, modern, or recent")
-    parser.add_argument("--n-sims", type=int, default=10_000, help="Monte Carlo iterations per year")
+    parser.add_argument(
+        "--n-sims", type=int, default=10_000, help="Monte Carlo iterations per year"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
     years = get_window_years(args.window)
-    print(f"\nBacktesting window='{args.window}' ({years[0]}–{years[-1]}), n_sims={args.n_sims:,}\n")
+    print(
+        f"\nBacktesting window='{args.window}' ({years[0]}–{years[-1]}), n_sims={args.n_sims:,}\n"
+    )
 
     rows = []
     for year in years:
