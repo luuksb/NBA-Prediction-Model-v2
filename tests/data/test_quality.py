@@ -15,7 +15,8 @@ class TestIqrOutlierRate:
         assert _iqr_outlier_rate(s) == 0.0
 
     def test_detects_extreme_outlier(self):
-        s = pd.Series([1.0] * 100 + [1000.0])
+        # Use a spread series so IQR > 0, then add a value far beyond 3*IQR
+        s = pd.Series(list(range(1, 101)) + [10000])
         rate = _iqr_outlier_rate(s)
         assert rate > 0.0
 

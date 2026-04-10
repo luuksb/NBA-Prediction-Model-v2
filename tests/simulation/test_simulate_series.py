@@ -103,20 +103,28 @@ class TestSimulateSeries:
         assert wins > 700
 
     def test_injury_draws_applied(self, team_features):
-        # With availability = 0.0 for BOS, bpm_avail_sum → 0, weakening BOS
-        injury_draws = {"BOS": np.zeros(1)}
-        rng = np.random.default_rng(0)
+        # With mean_rates=0.0 for all BOS stars, every draw > 0 → no healthy star
+        # → bpm_avail_sum=0 for BOS, weakening them significantly.
+        n_sims = 500
+        # draws_arr shape: (n_teams=1, n_stars=3, n_rounds=4, n_sims)
+        draws_arr = np.full((1, 3, 4, n_sims), 0.5)
+        injury_draws = {
+            "draws": draws_arr,
+            "team_index": {"BOS": 0},
+            "player_bpm": [[5.0, 5.0, 5.0]],   # BOS stars have high BPM
+            "mean_rates": [[0.0, 0.0, 0.0]],    # availability=0 → always injured
+        }
         wins_no_injury = sum(
             simulate_series("BOS", "MIA", team_features, np.random.default_rng(i), spec=SAMPLE_SPEC)
             == "BOS"
-            for i in range(500)
+            for i in range(n_sims)
         )
         wins_injured = sum(
             simulate_series(
                 "BOS", "MIA", team_features, np.random.default_rng(i),
-                spec=SAMPLE_SPEC, injury_draws=injury_draws, draw_index=0,
+                spec=SAMPLE_SPEC, injury_draws=injury_draws, draw_index=i,
             ) == "BOS"
-            for i in range(500)
+            for i in range(n_sims)
         )
         assert wins_injured < wins_no_injury
 

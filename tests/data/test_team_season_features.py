@@ -16,17 +16,17 @@ from src.data.assemble import build_team_season_features
 def _make_base() -> pd.DataFrame:
     """Minimal base series DataFrame with Round 1 entries for two teams per conf."""
     return pd.DataFrame([
-        {"series_id": "2020_BOS_MIA", "season": 2020, "round": 1,
+        {"series_id": "2020_BOS_MIA", "season": 2020, "round": "first_round",
          "conference": "East", "team_high": "BOS", "team_low": "MIA",
          "seed_high": 1, "seed_low": 8, "higher_seed_wins": 1},
-        {"series_id": "2020_MIL_ORL", "season": 2020, "round": 1,
+        {"series_id": "2020_MIL_ORL", "season": 2020, "round": "first_round",
          "conference": "East", "team_high": "MIL", "team_low": "ORL",
          "seed_high": 2, "seed_low": 7, "higher_seed_wins": 1},
-        {"series_id": "2020_LAL_POR", "season": 2020, "round": 1,
+        {"series_id": "2020_LAL_POR", "season": 2020, "round": "first_round",
          "conference": "West", "team_high": "LAL", "team_low": "POR",
          "seed_high": 1, "seed_low": 8, "higher_seed_wins": 1},
         # Round 2 series — should NOT appear in team_season_features
-        {"series_id": "2020_BOS_MIL", "season": 2020, "round": 2,
+        {"series_id": "2020_BOS_MIL", "season": 2020, "round": "second_round",
          "conference": "East", "team_high": "BOS", "team_low": "MIL",
          "seed_high": 1, "seed_low": 2, "higher_seed_wins": 0},
     ])
