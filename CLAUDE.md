@@ -136,7 +136,9 @@ nba-playoff-model/
 │   ├── run_model_selection.py
 │   ├── run_injury_sim.py
 │   ├── run_bracket_sim.py
-│   └── run_dashboard.py
+│   ├── run_dashboard.py
+│   └── analysis/              # Off-pipeline analysis scripts (not part of the build order)
+│       └── compare_models_insample.py  # LM vs LM+SF in-sample comparison (cross-module imports intentional)
 └── notebooks/                 # Exploration only, never production code
 ```
 
@@ -187,7 +189,7 @@ nba-playoff-model/
 - Don't use future data when computing features — everything must be "as of before this series"
 - Don't pickle models — use the JSON spec so simulation stays decoupled
 - Don't put production logic in notebooks
-- Don't import across module boundaries — if you need shared utilities, that's a sign the data contract needs updating
+- Don't import across module boundaries — if you need shared utilities, that's a sign the data contract needs updating. Exception: `scripts/analysis/` scripts may cross-import for one-off research; they are never part of the build pipeline
 - Don't hardcode 2025 or 2026 — use config values so years are easily updatable
 - Don't retry Basketball Reference if it blocks once — log and use alternative sources
 

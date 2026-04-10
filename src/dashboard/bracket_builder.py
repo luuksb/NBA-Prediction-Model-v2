@@ -9,9 +9,44 @@ No cross-module imports from src.model, src.simulation, src.data, or src.injury.
 from __future__ import annotations
 
 import math
-from typing import Any, Callable
+from typing import Any, Callable, TypedDict
 
 import pandas as pd
+
+
+class TeamNode(TypedDict):
+    """Display node for a single team in the bracket."""
+
+    abbrev: str
+    seed: int
+    conference: str
+    adv_prob: float
+    cond_win_prob: float
+    logo_url: str
+
+
+class MatchupNode(TypedDict):
+    """A single series matchup with a high-seed and a low-seed TeamNode."""
+
+    high: TeamNode
+    low: TeamNode
+
+
+class ModelSpecDict(TypedDict):
+    """Serialisable logit model specification (mirrors fit.ModelSpec)."""
+
+    features: list[str]
+    intercept: float
+    coefficients: dict[str, float]
+
+
+class BracketStructure(TypedDict):
+    """Complete display-ready bracket produced by build_bracket_structure()."""
+
+    west: dict[int, list[MatchupNode]]
+    east: dict[int, list[MatchupNode]]
+    finals: dict[int, list[MatchupNode]]
+    champion: TeamNode | None
 
 # ---------------------------------------------------------------------------
 # Logit win probability
@@ -22,7 +57,7 @@ def compute_win_prob(
     high_abbrev: str,
     low_abbrev: str,
     team_features: pd.DataFrame,
-    spec: dict[str, Any],
+    spec: ModelSpecDict,
 ) -> float:
     """Compute P(high_abbrev wins the series) using the locked logit model spec.
 
@@ -107,7 +142,7 @@ def _build_team_node(
     round_num: int,
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
-) -> dict[str, Any]:
+) -> TeamNode:
     """Build a single TeamNode dict for use in the bracket structure.
 
     Args:
@@ -145,8 +180,8 @@ def _build_r1_matchups(
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
+    spec: ModelSpecDict | None = None,
+) -> list[MatchupNode]:
     """Build the four Round 1 matchup dicts for one conference.
 
     Seeding pairs: 1v8, 2v7, 3v6, 4v5 (0-indexed: (0,7),(1,6),(2,5),(3,4)).
@@ -185,7 +220,7 @@ def _pick_rep(
     round_num: int,
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
-) -> dict[str, Any]:
+) -> TeamNode:
     """Pick the most-likely representative team from a set of candidates.
 
     The representative is the candidate with the highest advancement_prob
@@ -207,13 +242,13 @@ def _pick_rep(
 
 
 def _build_r2_matchups(
-    r1_matchups: list[dict[str, Any]],
+    r1_matchups: list[MatchupNode],
     conference: str,
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
+    spec: ModelSpecDict | None = None,
+) -> list[MatchupNode]:
     """Build the two Round 2 matchup dicts for one conference.
 
     NBA bracket pairing: (1/8 winner) vs (4/5 winner), (2/7 winner) vs (3/6 winner).
@@ -271,13 +306,13 @@ def _build_r2_matchups(
 
 
 def _build_r3_matchup(
-    r2_matchups: list[dict[str, Any]],
+    r2_matchups: list[MatchupNode],
     conference: str,
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    spec: ModelSpecDict | None = None,
+) -> MatchupNode:
     """Build the conference finals (Round 3) matchup dict.
 
     Representative teams are the R2 participants with highest advancement_prob for R3.
@@ -321,13 +356,13 @@ def _build_r3_matchup(
 
 
 def _build_finals_matchup(
-    east_r3: dict[str, Any],
-    west_r3: dict[str, Any],
+    east_r3: MatchupNode,
+    west_r3: MatchupNode,
     adv_df: pd.DataFrame,
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    spec: ModelSpecDict | None = None,
+) -> MatchupNode:
     """Build the NBA Finals (Round 4) matchup dict.
 
     Representative teams are the R3 participants with highest advancement_prob for R4.
@@ -396,8 +431,8 @@ def build_bracket_structure(
     logo_url_fn: Callable[[str], str],
     predicted_champion: str | None = None,
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    spec: ModelSpecDict | None = None,
+) -> BracketStructure:
     """Build the complete display-ready bracket structure.
 
     Args:
@@ -430,7 +465,7 @@ def build_bracket_structure(
     finals = _build_finals_matchup(east_r3, west_r3, adv_df, logo_url_fn, team_features, spec)
 
     # Champion node
-    champion: dict[str, Any] | None = None
+    champion: TeamNode | None = None
     if predicted_champion:
         # Find the predicted champion in the Finals matchup
         for side in ("high", "low"):
@@ -465,7 +500,7 @@ def get_upsets(
     adv_df: pd.DataFrame,
     upset_threshold: float = 0.50,
     team_features: pd.DataFrame | None = None,
-    spec: dict[str, Any] | None = None,
+    spec: ModelSpecDict | None = None,
 ) -> list[dict[str, Any]]:
     """Identify notable upsets from simulation output.
 
