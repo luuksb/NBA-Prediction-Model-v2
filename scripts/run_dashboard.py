@@ -17,6 +17,7 @@ from pathlib import Path
 # Add repo root so src/dashboard imports resolve
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 import yaml
@@ -29,6 +30,7 @@ from src.dashboard.data_loader import (
     load_model_spec,
     load_simulation_results,
     load_team_features,
+    logo_url,
 )
 from src.dashboard.html_renderer import render_bracket_html_canvas, render_champ_prob_chart_html
 from src.dashboard.ui_layout import compute_model_performance, load_actual_champions
