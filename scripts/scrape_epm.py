@@ -12,7 +12,7 @@ import pyjson5
 import requests
 
 BASE_URL = "https://dunksandthrees.com/epm"
-SEASONS = range(2002, 2026)
+SEASONS = range(2002, 2027)
 OUTPUT_PATH = "data/raw/epm.parquet"
 REQUEST_DELAY = 2.0  # seconds between requests
 

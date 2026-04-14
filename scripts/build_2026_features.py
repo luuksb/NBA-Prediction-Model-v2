@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""build_2025_features.py — Build team_season_features rows for the 2025 playoff bracket.
+"""build_2026_features.py — Build team_season_features rows for the 2026 playoff bracket.
 
-2025 is the validation year: no playoff series CSV exists yet (the pipeline
-only ingests historical series up through 2024).  This script reconstructs
-the 2025 per-team features from available raw data, using the pre-drawn
-injury simulation results in results/injury_sims/injury_meta_2025.json as
-the availability weights for bpm_avail_sum (the same role that actual
+2026 is the prediction year: no playoff series CSV exists yet.  This script
+reconstructs the 2026 per-team features from available raw data, using the
+pre-drawn injury simulation results in results/injury_sims/injury_meta_2026.json
+as the availability weights for bpm_avail_sum (the same role that actual
 game-log availability plays for historical years).
 
-Outputs: appends 16 rows (one per 2025 playoff team) to
+Outputs: appends 16 rows (one per 2026 playoff team) to
          data/final/team_season_features.parquet.
 
 Usage:
-    python scripts/build_2025_features.py
+    python scripts/build_2026_features.py
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ import logging
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -31,20 +31,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(
 logger = logging.getLogger(__name__)
 
 BRACKET_SEEDS_CONFIG = Path("configs/bracket_seeds.yaml")
-INJURY_META = Path("results/injury_sims/injury_meta_2025.json")
+INJURY_META = Path("results/injury_sims/injury_meta_2026.json")
 TEAM_FEATURES_PATH = Path("data/final/team_season_features.parquet")
 PLAYOFF_SERIES_DIR = Path("data/raw/playoff_series")
 ADVANCED_CSV = Path("data/raw/Advanced.csv")
 EPM_PARQUET = Path("data/raw/epm.parquet")
-FEATURES_YAML = Path("configs/features.yaml")
 
-YEAR = 2025
+YEAR = 2026
 EPM_START = 2002
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _load_2025_teams() -> list[str]:
+def _load_2026_teams() -> list[str]:
     with open(BRACKET_SEEDS_CONFIG) as f:
         cfg = yaml.safe_load(f)
     seeds = cfg["bracket_seeds"][YEAR]
@@ -52,14 +51,14 @@ def _load_2025_teams() -> list[str]:
 
 
 def _load_injury_meta() -> tuple[list[str], list[list[float]], list[list[float]]]:
-    """Return (teams, player_bpm, mean_rates) from injury_meta_2025.json."""
+    """Return (teams, player_bpm, mean_rates) from injury_meta_2026.json."""
     with open(INJURY_META) as f:
         meta = json.load(f)
     return meta["teams"], meta["player_bpm"], meta["mean_rates"]
 
 
 def _compute_roster_series_wins(teams: list[str]) -> dict[str, float]:
-    """Compute roster-based cumulative playoff series wins entering 2025.
+    """Compute roster-based cumulative playoff series wins entering 2026.
 
     Uses playoff_experience._build_roster_experience_table to sum each current
     roster player's personal prior series wins — the same logic used for
@@ -75,40 +74,28 @@ def _compute_roster_series_wins(teams: list[str]) -> dict[str, float]:
     }
 
 
-def _compute_coach_cum_wins_for_2025(teams: list[str]) -> dict[str, float]:
-    """Approximate coach cumulative series wins entering 2025.
+def _compute_coach_cum_wins_for_2026(teams: list[str]) -> dict[str, float]:
+    """Approximate coach cumulative series wins entering 2026.
 
     Strategy:
-      - For teams in the 2024 playoffs: pre-2024 cum value + 2024 series wins.
-      - For teams absent from 2024: use their pre-last-appearance cum value +
-        wins from that season (the coach's record at that point).
+      - Uses coach_experience.parquet (built from coaches_nba_api/ through 2025)
+        plus any 2025 playoff series results to derive the entering-2026 total.
+      - For teams absent from known series data: cumulative = 0.
     """
     ce = pd.read_parquet("data/intermediate/coach_experience.parquet")
-
-    # Build (season, series_id) → (team, side, cum_wins) lookup
-    df_2024 = pd.read_csv(PLAYOFF_SERIES_DIR / "2024_nba_api.csv",
-                          usecols=["series_id", "team_high", "team_low", "higher_seed_wins"])
 
     result: dict[str, float] = {}
 
     for team in teams:
-        # Find all appearances in coach_experience
-        as_high = ce[ce["series_id"].str.contains(f"_{team}_|_{team}$", regex=True)]
-        # More robust: match via series_id prefix pattern or explicit team cols aren't stored
-        # Instead reconstruct from series_id names
-        team_rows_h = ce[ce["series_id"].apply(
-            lambda s: s.split("_")[1] == team or
-            (len(s.split("_")) > 2 and s.split("_")[2] == team)
-        )]
-        # simpler: check if team appears as high or low from original raw CSVs
-        # For robustness just scan all series
         all_raw = []
         for csv_path in sorted(PLAYOFF_SERIES_DIR.glob("*_nba_api.csv")):
             yr = int(csv_path.stem.split("_")[0])
-            if yr > 2024:
+            if yr > 2025:
                 continue
-            tmp = pd.read_csv(csv_path, usecols=["season", "series_id", "team_high",
-                                                   "team_low", "higher_seed_wins"])
+            tmp = pd.read_csv(
+                csv_path,
+                usecols=["season", "series_id", "team_high", "team_low", "higher_seed_wins"],
+            )
             team_rows = tmp[(tmp["team_high"] == team) | (tmp["team_low"] == team)]
             all_raw.append(team_rows)
 
@@ -122,11 +109,8 @@ def _compute_coach_cum_wins_for_2025(teams: list[str]) -> dict[str, float]:
             result[team] = 0.0
             continue
 
-        # Get the most recent season this team appeared in
         last_season = int(team_all["season"].max())
         last_season_rows = team_all[team_all["season"] == last_season]
-
-        # Get pre-last-season cum from coach_experience for first series of that season
         first_series_id = last_season_rows.iloc[0]["series_id"]
         ce_row = ce[ce["series_id"] == first_series_id]
 
@@ -139,7 +123,6 @@ def _compute_coach_cum_wins_for_2025(teams: list[str]) -> dict[str, float]:
             else:
                 pre_cum = float(ce_row.get("coach_series_wins_cum_low", 0.0))
 
-        # Count series wins in last_season for this team
         season_wins = 0
         for _, row in last_season_rows.iterrows():
             winner = row["team_high"] if int(row["higher_seed_wins"]) == 1 else row["team_low"]
@@ -161,12 +144,11 @@ def _compute_player_features(
 
     bpm_avail_sum: computed directly from injury_meta (bpm × mean_rate for top-3).
     per_avail_sum: computed from Advanced.csv top-3 players with mean_rate weights.
-    star_flag:     1 × mean_rate if top player is in EPM/BPM top-5, else 0.
+    star_flag:     1 × mean_rate if top player is in EPM top-5, else BPM top-5 fallback.
     """
-    # Build injury-meta lookup by team
-    meta_by_team: dict[str, tuple[list[float], list[float]]] = {}
-    for i, t in enumerate(inj_teams):
-        meta_by_team[t] = (player_bpm[i], mean_rates[i])
+    meta_by_team: dict[str, tuple[list[float], list[float]]] = {
+        t: (player_bpm[i], mean_rates[i]) for i, t in enumerate(inj_teams)
+    }
 
     # bpm_avail_sum directly from meta
     bpm_avail: dict[str, float] = {}
@@ -178,14 +160,14 @@ def _compute_player_features(
             logger.warning("Team %s not found in injury meta — bpm_avail_sum=0", team)
             bpm_avail[team] = 0.0
 
-    # Load Advanced.csv for 2025 player PER data
+    # Load Advanced.csv for 2026 player PER data
     adv = pd.read_csv(
         ADVANCED_CSV,
         usecols=["season", "lg", "player", "team", "g", "per", "bpm", "usg_percent", "mp"],
     )
     adv = adv[
         (adv["lg"] == "NBA") & (adv["season"] == YEAR) &
-        (adv["team"] != "TOT") & (adv["g"] >= 10)
+        (~adv["team"].str.match(r"^\dTM$")) & (adv["g"] >= 10)
     ].copy()
     adv["per"] = pd.to_numeric(adv["per"], errors="coerce")
     adv["bpm"] = pd.to_numeric(adv["bpm"], errors="coerce")
@@ -193,12 +175,11 @@ def _compute_player_features(
     adv["mpg"] = pd.to_numeric(adv["mp"], errors="coerce") / adv["g"].replace(0, float("nan"))
 
     # For multi-team players keep the row with the most games
-    adv = (adv.sort_values("g", ascending=False)
-           .drop_duplicates(subset=["player"])
-           .reset_index(drop=True))
-
-    # Rank top-3 per team by composite score (z-norm BPM + usg + mpg equally weighted)
-    import numpy as np
+    adv = (
+        adv.sort_values("g", ascending=False)
+        .drop_duplicates(subset=["player"])
+        .reset_index(drop=True)
+    )
 
     def _z(col: pd.Series) -> pd.Series:
         std = col.std()
@@ -211,30 +192,31 @@ def _compute_player_features(
         _z(adv_all["mpg"].fillna(0))
     ) / 3.0
 
+    # EPM top-5 for 2026 (now available after scrape)
+    from src.shared.text_utils import normalise_player_name as _norm
+
+    superstar_norm: set[str] = set()
+    if EPM_PARQUET.exists():
+        epm = pd.read_parquet(EPM_PARQUET, columns=["season", "player_name"])
+        epm26 = epm[(epm["season"] == YEAR) & (epm["player_name"] != "Locked Player")]
+        if not epm26.empty:
+            superstar_norm = {_norm(n) for n in epm26["player_name"]}
+            logger.info("EPM entries for 2026: %d", len(superstar_norm))
+
+    if not superstar_norm:
+        bpm_top5 = adv.nlargest(5, "bpm")["player"].map(_norm).tolist()
+        superstar_norm = set(bpm_top5)
+        logger.warning("EPM 2026 unavailable — using BPM top-5 fallback: %s", bpm_top5)
+
     per_avail: dict[str, float] = {}
     star_flag: dict[str, float] = {}
 
-    # EPM / BPM top-5 set for 2025
-    superstar_norm: set[str] = set()
-    from src.shared.text_utils import normalise_player_name as _norm
-
-    if EPM_PARQUET.exists():
-        epm = pd.read_parquet(EPM_PARQUET, columns=["season", "player_name"])
-        epm25 = epm[(epm["season"] == YEAR) & (epm["player_name"] != "Locked Player")]
-        superstar_norm = {_norm(n) for n in epm25["player_name"]}
-        logger.info("EPM top-5 for 2025: %d entries", len(superstar_norm))
-
-    if not superstar_norm:
-        # Fall back to BPM top-5 across all 2025 NBA players
-        bpm_top5 = (adv.nlargest(5, "bpm")["player"]
-                    .map(_norm).tolist())
-        superstar_norm = set(bpm_top5)
-        logger.info("BPM top-5 fallback for 2025: %s", bpm_top5)
-
     for team in teams:
-        team_players = (adv_all[adv_all["team"] == team]
-                        .nlargest(3, "composite")
-                        .reset_index(drop=True))
+        team_players = (
+            adv_all[adv_all["team"] == team]
+            .nlargest(3, "composite")
+            .reset_index(drop=True)
+        )
 
         rates = meta_by_team.get(team, ([0.85, 0.85, 0.85], [0.85, 0.85, 0.85]))[1]
 
@@ -258,19 +240,55 @@ def _compute_player_features(
     return bpm_avail, per_avail, star_flag
 
 
+def _load_team_stats_for_year(teams: list[str], year: int) -> pd.DataFrame:
+    """Load team ratings for a given year by team abbreviation list.
+
+    The standard build_team_stats() relies on the playoffs==True flag in the
+    raw CSVs.  For 2026 that flag was only set for teams that clinched early, so
+    we bypass it and filter by the known 16-team playoff bracket instead.
+
+    Args:
+        teams: List of team abbreviations (e.g. ['DET', 'BOS', ...]).
+        year: Season end-year (e.g. 2026).
+
+    Returns:
+        DataFrame with columns: year, team, <all numeric stat columns>.
+    """
+    per100_path = Path("data/raw/Team Stats Per 100 Poss.csv")
+    summaries_path = Path("data/raw/Team Summaries.csv")
+
+    _meta = frozenset(["season", "lg", "team", "abbreviation", "playoffs", "g", "mp",
+                        "pw", "pl", "arena", "attend", "attend_g"])
+
+    def _load(path: Path) -> pd.DataFrame:
+        df = pd.read_csv(path)
+        df = df[(df["lg"] == "NBA") & (df["season"] == year) &
+                (df["abbreviation"].isin(teams))].copy()
+        stat_cols = [c for c in df.columns if c not in _meta]
+        for col in stat_cols:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df[["season", "abbreviation"] + stat_cols].reset_index(drop=True)
+
+    per100 = _load(per100_path)
+    summaries = _load(summaries_path)
+    merged = per100.merge(summaries, on=["season", "abbreviation"],
+                          how="outer", suffixes=("", "_summ"))
+    return merged.rename(columns={"season": "year", "abbreviation": "team"})
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    logger.info("=== build_2025_features START ===")
+    logger.info("=== build_2026_features START ===")
 
-    teams = _load_2025_teams()
-    logger.info("2025 playoff teams (%d): %s", len(teams), teams)
+    teams = _load_2026_teams()
+    logger.info("2026 playoff teams (%d): %s", len(teams), teams)
 
     # ── 1. Team ratings (from Kaggle CSVs) ────────────────────────────────────
-    from src.data.steps.team_ratings import build_team_stats
-    team_stats = build_team_stats([YEAR])
-    team_stats = team_stats[team_stats["team"].isin(teams)].copy()
-    team_stats = team_stats.rename(columns={"season": "year"})
+    # Note: build_team_stats filters playoffs==True, which only captured the 3
+    # teams that clinched early in the 2026 season CSV.  For 2026 we load by
+    # team abbreviation directly so all 16 playoff teams are included.
+    team_stats = _load_team_stats_for_year(teams, YEAR)
     logger.info("Team ratings: %d rows", len(team_stats))
 
     # ── 2. Injury-meta based player features ──────────────────────────────────
@@ -284,20 +302,20 @@ def main() -> None:
     team_stats["star_flag"] = team_stats["team"].map(star_flag)
     logger.info("Player features computed.")
 
-    # ── 3. Roster-based playoff series wins entering 2025 ─────────────────────
+    # ── 3. Roster-based playoff series wins entering 2026 ─────────────────────
     cum_wins = _compute_roster_series_wins(teams)
     team_stats["playoff_series_wins"] = team_stats["team"].map(cum_wins).fillna(0.0)
     logger.info("Playoff series wins computed.")
 
-    # ── 4. Coach cumulative wins entering 2025 ────────────────────────────────
-    coach_wins = _compute_coach_cum_wins_for_2025(teams)
+    # ── 4. Coach cumulative wins entering 2026 ────────────────────────────────
+    coach_wins = _compute_coach_cum_wins_for_2026(teams)
     team_stats["coach_series_wins_cum"] = team_stats["team"].map(coach_wins).fillna(0.0)
     logger.info("Coach wins computed.")
 
     # ── 5. Merge with existing team_season_features ────────────────────────────
     existing = pd.read_parquet(TEAM_FEATURES_PATH)
 
-    # Drop any stale 2025 rows (idempotent re-runs)
+    # Drop any stale 2026 rows (idempotent re-runs)
     existing = existing[existing["year"] != YEAR]
 
     # Align columns: keep only columns present in existing
@@ -316,13 +334,17 @@ def main() -> None:
     )
 
     # Print summary
-    print("\n2025 feature values:")
-    print(combined[combined["year"] == YEAR][
-        ["team", "bpm_avail_sum", "playoff_series_wins", "ts_percent",
-         "per_avail_sum", "star_flag", "coach_series_wins_cum"]
-    ].sort_values("bpm_avail_sum", ascending=False).to_string(index=False))
+    print(f"\n{YEAR} feature values:")
+    print(
+        combined[combined["year"] == YEAR][
+            ["team", "bpm_avail_sum", "playoff_series_wins", "ts_percent",
+             "per_avail_sum", "star_flag", "coach_series_wins_cum"]
+        ]
+        .sort_values("bpm_avail_sum", ascending=False)
+        .to_string(index=False)
+    )
 
-    logger.info("=== build_2025_features DONE ===")
+    logger.info("=== build_2026_features DONE ===")
 
 
 if __name__ == "__main__":
