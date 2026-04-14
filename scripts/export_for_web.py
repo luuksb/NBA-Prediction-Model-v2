@@ -27,11 +27,15 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+import yaml
 
 from src.dashboard.bracket_builder import build_bracket_structure
 from src.dashboard.data_loader import (
@@ -127,6 +131,219 @@ def load_model_metrics(features: list[str], window: str) -> dict[str, Optional[f
                     "auc_roc": float(row["auc_roc"]) if "auc_roc" in row.index else None,
                 }
     return {"mcfadden_r2": None, "brier_score": None, "auc_roc": None}
+
+
+# ---------------------------------------------------------------------------
+# In-sample fit metrics
+# ---------------------------------------------------------------------------
+
+
+def compute_insample_fit(window: str, spec: dict[str, Any]) -> dict[str, Any]:
+    """Compute in-sample series and champion prediction accuracy for a training window.
+
+    Uses the stored model coefficients (no refit) to compute logistic predictions
+    on the training data. Champion accuracy is read from per-year simulation
+    summary.json files.
+
+    Args:
+        window: Training window name ('full', 'modern', 'recent').
+        spec: Model spec dict with 'features', 'coefficients', 'intercept'.
+
+    Returns:
+        Dict with keys: correct_series, total_series, correct_champs, total_champs.
+        Returns zeros if series_dataset.parquet or training_windows.yaml are missing.
+    """
+    dataset_path = Path("data/final/series_dataset.parquet")
+    windows_config = Path("configs/training_windows.yaml")
+    if not dataset_path.exists() or not windows_config.exists():
+        return {"correct_series": None, "total_series": None, "correct_champs": None, "total_champs": None}
+
+    with open(windows_config) as f:
+        tw_cfg = yaml.safe_load(f)
+    window_row = next((w for w in tw_cfg["windows"] if w["name"] == window), None)
+    if window_row is None:
+        return {"correct_series": None, "total_series": None, "correct_champs": None, "total_champs": None}
+    start_year, end_year = window_row["start_year"], window_row["end_year"]
+
+    features = spec["features"]
+    coefs = spec["coefficients"]
+    intercept = spec["intercept"]
+
+    df = pd.read_parquet(dataset_path)
+    sub = df[(df["year"] >= start_year) & (df["year"] <= end_year)].dropna(
+        subset=features + ["higher_seed_wins"]
+    )
+
+    def _sigmoid(x: float) -> float:
+        return 1.0 / (1.0 + math.exp(-x))
+
+    logit_vals = sub.apply(
+        lambda row: intercept + sum(row[f] * coefs[f] for f in features), axis=1
+    )
+    probs = logit_vals.apply(_sigmoid)
+    y = sub["higher_seed_wins"].values
+    preds = (probs >= 0.5).astype(int).values
+    correct_series = int((preds == y).sum())
+    total_series = int(len(y))
+
+    # Load actual champions from raw playoff CSVs (same source as the dashboard)
+    _champion_overrides: dict[int, str] = {1980: "LAL", 1981: "BOS", 1982: "LAL", 1983: "PHI", 2025: "OKC"}
+    actual_champions: dict[int, str] = dict(_champion_overrides)
+    playoff_series_dir = Path("data/raw/playoff_series")
+    if playoff_series_dir.exists():
+        for csv_file in sorted(playoff_series_dir.glob("*_nba_api.csv")):
+            try:
+                csv_df = pd.read_csv(csv_file)
+                yr = int(csv_df["season"].iloc[0])
+                if yr in _champion_overrides:
+                    continue
+                finals_rows = csv_df[csv_df["round"] == "finals"]
+                if len(finals_rows) != 1:
+                    continue
+                row = finals_rows.iloc[0]
+                actual_champions[yr] = row["team_high"] if int(row["higher_seed_wins"]) == 1 else row["team_low"]
+            except Exception:
+                continue
+
+    # Champion accuracy: compare simulation predicted_champion vs actual
+    sim_dir = Path("results/simulations")
+    correct_champs = 0
+    total_champs = 0
+    for yr in range(start_year, end_year + 1):
+        summary_path = sim_dir / f"{yr}_{window}" / "summary.json"
+        if not summary_path.exists():
+            continue
+        with open(summary_path) as f:
+            sim_summary = json.load(f)
+        predicted = sim_summary.get("predicted_champion")
+        actual = actual_champions.get(yr)
+        if not predicted or actual is None:
+            continue
+        total_champs += 1
+        if predicted == actual:
+            correct_champs += 1
+
+    return {
+        "correct_series": correct_series,
+        "total_series": total_series,
+        "correct_champs": correct_champs,
+        "total_champs": total_champs,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Inference statistics (z-values and p-values)
+# ---------------------------------------------------------------------------
+
+
+def compute_inference_stats(window: str, spec: dict[str, Any]) -> dict[str, Any]:
+    """Refit the chosen model to extract z-values and p-values per feature.
+
+    Refits using the same data slice and features as the locked model spec.
+    Uses statsmodels Logit so we get Wald z-statistics and two-sided p-values.
+
+    Args:
+        window: Training window name ('full', 'modern', 'recent').
+        spec: Model spec dict with 'features', 'coefficients', 'intercept'.
+
+    Returns:
+        Dict with keys 'z_values' and 'p_values', each mapping feature name
+        to float. Also includes 'intercept_z' and 'intercept_p' for the
+        constant term. Returns empty dicts if data is unavailable.
+    """
+    dataset_path = Path("data/final/series_dataset.parquet")
+    windows_config = Path("configs/training_windows.yaml")
+    if not dataset_path.exists() or not windows_config.exists():
+        return {"z_values": {}, "p_values": {}}
+
+    with open(windows_config) as f:
+        tw_cfg = yaml.safe_load(f)
+    window_row = next((w for w in tw_cfg["windows"] if w["name"] == window), None)
+    if window_row is None:
+        return {"z_values": {}, "p_values": {}}
+
+    start_year, end_year = window_row["start_year"], window_row["end_year"]
+    features = spec["features"]
+
+    df = pd.read_parquet(dataset_path)
+    sub = df[(df["year"] >= start_year) & (df["year"] <= end_year)].dropna(
+        subset=features + ["higher_seed_wins"]
+    )
+
+    X = sm.add_constant(sub[features].astype(float))
+    y = sub["higher_seed_wins"].astype(int)
+
+    try:
+        result = sm.Logit(y, X).fit(disp=False)
+    except Exception:
+        return {"z_values": {}, "p_values": {}}
+
+    z_vals = result.tvalues
+    p_vals = result.pvalues
+
+    return {
+        "z_values": {feat: round(float(z_vals[feat]), 4) for feat in features},
+        "p_values": {feat: round(float(p_vals[feat]), 4) for feat in features},
+        "intercept_z": round(float(z_vals["const"]), 4),
+        "intercept_p": round(float(p_vals["const"]), 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Injury impact
+# ---------------------------------------------------------------------------
+
+
+def load_injury_impact(run_id: str) -> Optional[dict[str, Any]]:
+    """Compute injury impact statistics from a run's iterations.parquet.
+
+    Replicates the injury impact section shown in the dashboard's left panel.
+    Only meaningful for out-of-sample years where injury draws were used.
+
+    Args:
+        run_id: Simulation run identifier, e.g. '2025_modern'.
+
+    Returns:
+        Dict with keys:
+            pct_finals_with_injury: fraction of Finals with at least one injured star.
+            healthy_finalist_win_rate: win rate of the healthy finalist in one-sided
+                injury matchups (one finalist healthy, other injured).
+            pct_champ_with_injury: fraction of Finals where the champion had an injury.
+        Returns None if iterations.parquet doesn't exist or has no injury data.
+    """
+    iter_path = Path("results/simulations") / run_id / "iterations.parquet"
+    if not iter_path.exists():
+        return None
+
+    iter_df = pd.read_parquet(iter_path)
+    inj_df = iter_df.dropna(
+        subset=["finalist_east_injuries", "finalist_west_injuries"]
+    ).copy()
+    if inj_df.empty:
+        return None
+
+    # Check if injury data is actually present (non-trivial)
+    if (inj_df["finalist_east_injuries"] == 0).all() and (inj_df["finalist_west_injuries"] == 0).all():
+        return None
+
+    inj_df["_east_inj"] = inj_df["finalist_east_injuries"].astype(int)
+    inj_df["_west_inj"] = inj_df["finalist_west_injuries"].astype(int)
+    inj_df["_total_inj"] = inj_df["_east_inj"] + inj_df["_west_inj"]
+    inj_df["_champ_is_east"] = inj_df["champion"] == inj_df["finalist_east"]
+    inj_df["_champ_inj"] = inj_df["_east_inj"].where(inj_df["_champ_is_east"], inj_df["_west_inj"])
+    inj_df["_loser_inj"] = inj_df["_west_inj"].where(inj_df["_champ_is_east"], inj_df["_east_inj"])
+
+    pct_any = round(float((inj_df["_total_inj"] > 0).mean()), 4)
+    one_sided = inj_df[(inj_df["_champ_inj"] == 0) != (inj_df["_loser_inj"] == 0)]
+    healthy_won = int(((one_sided["_champ_inj"] == 0) & (one_sided["_loser_inj"] > 0)).sum())
+    healthy_win_rate = round(healthy_won / len(one_sided), 4) if len(one_sided) > 0 else 0.0
+    pct_inj_champ = round(float((inj_df["_champ_inj"] > 0).mean()), 4)
+
+    return {
+        "pct_finals_with_injury": pct_any,
+        "healthy_finalist_win_rate": healthy_win_rate,
+        "pct_champ_with_injury": pct_inj_champ,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +483,8 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
     spec = load_model_spec(window)
     team_features = load_team_features(year)
     metrics = load_model_metrics(spec["features"], window)
+    insample_fit = compute_insample_fit(window, spec)
+    injury_impact = load_injury_impact(run_id)
 
     bracket = build_bracket_structure(
         east_seeds=seeds["east"],
@@ -304,17 +523,20 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "n_simulations": int(summary["n_sims"]),
             "training_window": window_label,
+            "n_obs": spec.get("n_obs"),
             "features": spec["features"],
             "coefficients": spec.get("coefficients", {}),
             "intercept": spec.get("intercept"),
             "pseudo_r2": round(metrics["mcfadden_r2"], 4) if metrics["mcfadden_r2"] is not None else None,
             "auc": round(metrics["auc_roc"], 4) if metrics["auc_roc"] is not None else None,
             "brier_score": round(metrics["brier_score"], 4) if metrics["brier_score"] is not None else None,
+            "insample_fit": insample_fit,
         },
         "actual_champion": summary.get("actual_champion"),
         "teams": teams,
         "bracket": build_bracket_json(bracket),
         "championship_probs": champ_probs,
+        "injury_impact": injury_impact,
     }
 
     validate_export(output)
@@ -413,6 +635,61 @@ def export_all(output_dir: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Model overview export (all windows in one file)
+# ---------------------------------------------------------------------------
+
+
+def export_model_overview(output_path: str) -> dict[str, Any]:
+    """Export a model overview JSON with metrics for all three training windows.
+
+    Produces a self-contained file with n_obs, fit metrics, and in-sample
+    accuracy for each window ('full', 'modern', 'recent'). Intended as the
+    nba_results.json consumed by the web app's model-info panel.
+
+    Args:
+        output_path: File path where the JSON will be written.
+
+    Returns:
+        The exported dict (also written to disk).
+    """
+    _window_labels = {"full": "1980–2024", "modern": "2000–2024", "recent": "2014–2024"}
+    windows_out: dict[str, Any] = {}
+
+    for window in ("full", "modern", "recent"):
+        spec = load_model_spec(window)
+        metrics = load_model_metrics(spec["features"], window)
+        insample_fit = compute_insample_fit(window, spec)
+        inference = compute_inference_stats(window, spec)
+        windows_out[window] = {
+            "window_span": _window_labels.get(window, window),
+            "n_obs": spec.get("n_obs"),
+            "features": spec["features"],
+            "coefficients": spec.get("coefficients", {}),
+            "intercept": spec.get("intercept"),
+            "z_values": inference.get("z_values", {}),
+            "p_values": inference.get("p_values", {}),
+            "intercept_z": inference.get("intercept_z"),
+            "intercept_p": inference.get("intercept_p"),
+            "pseudo_r2": round(metrics["mcfadden_r2"], 4) if metrics["mcfadden_r2"] is not None else None,
+            "auc": round(metrics["auc_roc"], 4) if metrics["auc_roc"] is not None else None,
+            "brier_score": round(metrics["brier_score"], 4) if metrics["brier_score"] is not None else None,
+            "insample_fit": insample_fit,
+        }
+
+    output: dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "training_windows": windows_out,
+    }
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(output, f, indent=2)
+
+    print(f"Exported model overview -> {output_path}")
+    return output
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -433,10 +710,15 @@ def main() -> None:
         action="store_true",
         help="Export all discovered simulation runs",
     )
+    mode.add_argument(
+        "--model-overview",
+        action="store_true",
+        help="Export model overview JSON with metrics for all three training windows",
+    )
     parser.add_argument(
         "--output",
         default="nba_results.json",
-        help="Output JSON file path for single-run mode (default: nba_results.json)",
+        help="Output JSON file path for single-run or model-overview mode (default: nba_results.json)",
     )
     parser.add_argument(
         "--output_dir",
@@ -447,6 +729,8 @@ def main() -> None:
 
     if args.all:
         export_all(args.output_dir)
+    elif args.model_overview:
+        export_model_overview(args.output)
     else:
         run_id = args.run_id or "2025_modern"
         export_run(run_id, args.output)
