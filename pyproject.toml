@@ -17,6 +17,8 @@ dependencies = [
     "pyyaml>=6.0",
     "nba_api>=1.4",
     "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "playwright>=1.40",
     "tqdm>=4.66",
 ]
 

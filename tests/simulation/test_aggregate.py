@@ -12,13 +12,14 @@ ALL_TEAMS = ["BOS", "MIA", "NYK", "MIL", "OKC", "LAL", "DEN", "PHX",
 
 
 def _make_outcome(champion: str, finalist_east: str, finalist_west: str,
-                  round_exits: dict) -> dict:
+                  round_exits: dict, series_results: list | None = None) -> dict:
     return {
         "iteration": 0,
         "champion": champion,
         "finalist_east": finalist_east,
         "finalist_west": finalist_west,
         "round_exits": round_exits,
+        "series_results": series_results or [],
     }
 
 
@@ -80,3 +81,28 @@ class TestAggregateOutcomes:
         for team in ALL_TEAMS:
             assert team in result["championship_prob"]
             assert team in result["round_advancement"]
+
+    def test_matchup_wins_counts_correctly(self):
+        # BOS beats MIA in R1 twice, MIA beats BOS once
+        series = [{"team_a": "BOS", "team_b": "MIA", "round": 1, "winner": "BOS"}]
+        exits = {t: 1 for t in ALL_TEAMS if t not in ("BOS", "OKC")}
+        outcomes = [
+            _make_outcome("BOS", "BOS", "OKC", exits, series_results=series),
+            _make_outcome("BOS", "BOS", "OKC", exits, series_results=series),
+            _make_outcome("BOS", "BOS", "OKC", exits, series_results=[
+                {"team_a": "BOS", "team_b": "MIA", "round": 1, "winner": "MIA"}
+            ]),
+        ]
+        result = aggregate_outcomes(outcomes, ALL_TEAMS)
+        mw = result["matchup_wins"]
+        key = ("BOS", "MIA", 1)
+        assert key in mw
+        assert mw[key]["wins_a"] == 2   # BOS=team_a (alphabetically first)
+        assert mw[key]["wins_b"] == 1   # MIA=team_b
+        assert mw[key]["total"] == 3
+
+    def test_matchup_wins_empty_when_no_series_results(self):
+        exits = {t: 1 for t in ALL_TEAMS if t not in ("BOS", "OKC")}
+        outcomes = [_make_outcome("BOS", "BOS", "OKC", exits)]
+        result = aggregate_outcomes(outcomes, ALL_TEAMS)
+        assert result["matchup_wins"] == {}

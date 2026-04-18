@@ -793,6 +793,8 @@ with main_col:
             predicted_champion=summary.get("predicted_champion"),
             team_features=team_features,
             spec=spec,
+            matchup_wins=sim.get("matchup_wins", {}),
+            champ_probs=champ_probs_dict,
         )
         components.html(
             render_bracket_html_canvas(bracket, COLORS, prob_mode=prob_mode, champ_probs=champ_probs_dict),

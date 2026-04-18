@@ -81,6 +81,24 @@ def save_simulation_report(
     ).sort_values("championship_prob", ascending=False)
     champ_df.to_parquet(out_dir / "championship_probs.parquet", index=False)
 
+    # Direct matchup wins parquet
+    matchup_wins = aggregated.get("matchup_wins", {})
+    if matchup_wins:
+        mw_rows = [
+            {
+                "team_a": k[0],
+                "team_b": k[1],
+                "round": k[2],
+                "wins_a": v["wins_a"],
+                "wins_b": v["wins_b"],
+                "total": v["total"],
+            }
+            for k, v in matchup_wins.items()
+        ]
+        mw_df = pd.DataFrame(mw_rows)
+        mw_df.to_parquet(out_dir / "matchup_wins.parquet", index=False)
+        logger.info("Matchup wins saved to %s", out_dir / "matchup_wins.parquet")
+
     # Per-iteration parquet (finalist + injury tracking)
     if outcomes is not None:
         iter_rows = [

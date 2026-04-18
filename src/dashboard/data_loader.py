@@ -95,10 +95,22 @@ def load_simulation_results(run_id: str) -> dict[str, Any]:
         raise ValueError(f"championship_probs.parquet missing for run '{run_id}'")
     champ_df = pd.read_parquet(champ_path)
 
+    # Direct matchup win rates: (team_a, team_b, round) → P(team_a wins)
+    # team_a < team_b alphabetically; absent when file predates this feature.
+    matchup_wins: dict[tuple[str, str, int], float | None] = {}
+    mw_path = run_dir / "matchup_wins.parquet"
+    if mw_path.exists():
+        mw_df = pd.read_parquet(mw_path)
+        for _, row in mw_df.iterrows():
+            total = int(row["total"])
+            key: tuple[str, str, int] = (str(row["team_a"]), str(row["team_b"]), int(row["round"]))
+            matchup_wins[key] = int(row["wins_a"]) / total if total > 0 else None
+
     return {
         "summary": summary,
         "round_advancement": adv_df,
         "championship_probs": champ_df,
+        "matchup_wins": matchup_wins,
     }
 
 

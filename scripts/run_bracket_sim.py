@@ -6,6 +6,7 @@ Runs Monte Carlo bracket iterations for a given year and saves results.
 Usage:
     python scripts/run_bracket_sim.py --year 2026 --window modern [--n-sims 50000]
     python scripts/run_bracket_sim.py --year 2024 --window full --no-injury
+    python scripts/run_bracket_sim.py --year 2026 --window modern --no-override
 """
 
 from __future__ import annotations
@@ -13,7 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +43,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility.")
     parser.add_argument("--no-injury", action="store_true", help="Disable injury adjustment.")
+    parser.add_argument(
+        "--no-override",
+        action="store_true",
+        help="Skip real-time CBS Sports injury override (use simulated draws as-is).",
+    )
     return parser.parse_args()
 
 
@@ -240,6 +248,70 @@ def main() -> None:
             injury_draws = load_injury_draws(args.year, args.n_sims, args.seed)
         except FileNotFoundError as e:
             logger.warning("%s — proceeding without injury adjustment.", e)
+
+    # Apply real-time CBS Sports injury overrides (optional, 2025/2026 only)
+    if injury_draws is not None and not args.no_override:
+        try:
+            from src.injury import identify_top_players as itp
+            from src.injury.injury_overrides import apply_known_injuries
+
+            _adv_path = RAW_DIR / "Advanced.csv"
+            if _adv_path.exists():
+                _adv_df = pd.read_csv(_adv_path)
+                # Mirror the normalization used in run_injury_sim.py
+                _adv_df = _adv_df[~_adv_df["team"].str.match(r"^\dTM$")].copy()
+                _adv_df["player_name_norm"] = _adv_df["player"].apply(
+                    lambda n: re.sub(
+                        r"_(jr|sr|ii|iii|iv|v)$",
+                        "",
+                        re.sub(
+                            r"[^a-z0-9]+",
+                            "_",
+                            unicodedata.normalize("NFKD", str(n))
+                            .encode("ascii", errors="ignore")
+                            .decode("ascii")
+                            .lower(),
+                        ).strip("_"),
+                    )
+                )
+                _top_players = itp.identify_top_players(
+                    players_df=_adv_df,
+                    team_col="team",
+                    year_col="season",
+                    target_year=args.year,
+                )
+                logger.info("Applying CBS Sports injury overrides for year %d…", args.year)
+                _rng_override = np.random.default_rng(args.seed)
+                injury_draws = apply_known_injuries(
+                    injury_draws, _top_players, rng=_rng_override
+                )
+                _log = injury_draws.get("_override_log", [])
+                if _log:
+                    _hdr = f"{'Player':<28} {'Team':<5} {'Star':>4}  {'Return':<12}  R1    R2    R3    R4"
+                    logger.info("Injury override summary:\n%s\n%s", _hdr, "-" * len(_hdr))
+                    for _e in _log:
+                        logger.info(
+                            "  %-26s  %-4s  %4d  %-12s  %.2f  %.2f  %.2f  %.2f",
+                            _e["player_name"],
+                            _e["team"],
+                            _e["star_idx"],
+                            _e["return_date"],
+                            _e["round_1"],
+                            _e["round_2"],
+                            _e["round_3"],
+                            _e["round_4"],
+                        )
+                else:
+                    logger.info("No top-3 roster players found in CBS Sports injury report.")
+            else:
+                logger.warning(
+                    "%s not found — skipping injury overrides (run data pipeline first).",
+                    _adv_path,
+                )
+        except RuntimeError as exc:
+            logger.warning("Injury override skipped: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Unexpected error applying injury overrides: %s", exc)
 
     # Run simulations
     all_teams = east_seeds + west_seeds

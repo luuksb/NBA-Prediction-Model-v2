@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 import pandas as pd
 
@@ -21,12 +21,16 @@ def aggregate_outcomes(outcomes: list[dict], all_teams: list[str]) -> dict:
         - most_common_champion: team ID
         - most_common_finals: (team_a, team_b) tuple
         - n_sims: number of iterations
+        - matchup_wins: {(team_a, team_b, round): {"wins_a": int, "wins_b": int, "total": int}}
+            where team_a < team_b alphabetically; wins_a = wins by team_a.
     """
     n = len(outcomes)
     champ_counts: Counter = Counter()
     finals_counts: Counter = Counter()
     # round_reached[team][round] = count of iterations where team reached that round
     round_reached: dict[str, Counter] = {t: Counter() for t in all_teams}
+    # matchup_counts[(team_a, team_b, round)] = [wins_a, wins_b, total]
+    matchup_counts: dict[tuple[str, str, int], list[int]] = defaultdict(lambda: [0, 0, 0])
 
     for outcome in outcomes:
         champ = outcome["champion"]
@@ -48,10 +52,23 @@ def aggregate_outcomes(outcomes: list[dict], all_teams: list[str]) -> dict:
                 for r in range(1, exit_round + 1):
                     round_reached[team][r] += 1
 
+        for sr in outcome.get("series_results", []):
+            a, b = sorted([sr["team_a"], sr["team_b"]])
+            key = (a, b, sr["round"])
+            matchup_counts[key][2] += 1
+            if sr["winner"] == a:
+                matchup_counts[key][0] += 1
+            else:
+                matchup_counts[key][1] += 1
+
     championship_prob = {t: champ_counts[t] / n for t in all_teams}
     round_advancement = {t: {r: round_reached[t][r] / n for r in range(1, 5)} for t in all_teams}
     most_common_champion = champ_counts.most_common(1)[0][0] if champ_counts else None
     most_common_finals = finals_counts.most_common(1)[0][0] if finals_counts else None
+    matchup_wins = {
+        k: {"wins_a": v[0], "wins_b": v[1], "total": v[2]}
+        for k, v in matchup_counts.items()
+    }
 
     return {
         "championship_prob": championship_prob,
@@ -59,4 +76,5 @@ def aggregate_outcomes(outcomes: list[dict], all_teams: list[str]) -> dict:
         "most_common_champion": most_common_champion,
         "most_common_finals": most_common_finals,
         "n_sims": n,
+        "matchup_wins": matchup_wins,
     }

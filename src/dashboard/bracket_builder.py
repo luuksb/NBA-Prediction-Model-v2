@@ -49,6 +49,39 @@ class BracketStructure(TypedDict):
     champion: TeamNode | None
 
 # ---------------------------------------------------------------------------
+# Direct matchup win probability (simulation-derived)
+# ---------------------------------------------------------------------------
+
+
+def _direct_matchup_prob(
+    hi: str,
+    lo: str,
+    round_num: int,
+    matchup_wins: dict[tuple[str, str, int], float | None],
+) -> float | None:
+    """Return P(hi wins | hi vs lo in round_num) from direct simulation matchup counts.
+
+    Args:
+        hi: Abbreviation of the higher-seeded team.
+        lo: Abbreviation of the lower-seeded team.
+        round_num: Round number (1–4).
+        matchup_wins: Dict mapping (team_a, team_b, round) → P(team_a wins),
+            where team_a < team_b alphabetically. Absent keys mean no data.
+
+    Returns:
+        Float in [0, 1], or None if this matchup never occurred in simulations.
+    """
+    a, b = sorted([hi, lo])
+    key = (a, b, round_num)
+    if key not in matchup_wins:
+        return None
+    p_a = matchup_wins[key]
+    if p_a is None:
+        return None
+    return float(p_a) if hi == a else 1.0 - float(p_a)
+
+
+# ---------------------------------------------------------------------------
 # Logit win probability
 # ---------------------------------------------------------------------------
 
@@ -189,10 +222,14 @@ def _build_r1_matchups(
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
     spec: ModelSpecDict | None = None,
+    matchup_wins: dict[tuple[str, str, int], float | None] | None = None,
 ) -> list[MatchupNode]:
     """Build the four Round 1 matchup dicts for one conference.
 
     Seeding pairs: 1v8, 2v7, 3v6, 4v5 (0-indexed: (0,7),(1,6),(2,5),(3,4)).
+
+    Win probability priority: direct simulation matchup rate (matchup_wins) >
+    static logit (team_features + spec) > simulation advancement ratio.
 
     Args:
         seeds: 8 team abbreviations, ordered 1st (index 0) to 8th (index 7).
@@ -201,19 +238,27 @@ def _build_r1_matchups(
         logo_url_fn: Callable mapping abbrev -> URL string.
         team_features: Optional DataFrame of raw per-team features (indexed by team).
         spec: Optional model spec dict for direct logit win probability.
+        matchup_wins: Optional dict mapping (team_a, team_b, round) → P(team_a wins).
 
     Returns:
         List of 4 matchup dicts in order 1v8, 2v7, 3v6, 4v5.
         Each matchup: {'high': TeamNode, 'low': TeamNode}.
-        When team_features and spec are provided, cond_win_prob is the direct
-        logit model prediction; otherwise it falls back to adv_prob ratios.
     """
     pairs = [(0, 7), (1, 6), (2, 5), (3, 4)]
     matchups = []
     for hi_idx, lo_idx in pairs:
         hi = _build_team_node(seeds[hi_idx], hi_idx + 1, conference, 1, adv_df, logo_url_fn)
         lo = _build_team_node(seeds[lo_idx], lo_idx + 1, conference, 1, adv_df, logo_url_fn)
-        if team_features is not None and spec is not None:
+        if matchup_wins is not None:
+            p = _direct_matchup_prob(seeds[hi_idx], seeds[lo_idx], 1, matchup_wins)
+            if p is not None:
+                hi["cond_win_prob"] = p
+                lo["cond_win_prob"] = 1.0 - p
+            elif team_features is not None and spec is not None:
+                p = compute_win_prob(seeds[hi_idx], seeds[lo_idx], team_features, spec)
+                hi["cond_win_prob"] = p
+                lo["cond_win_prob"] = 1.0 - p
+        elif team_features is not None and spec is not None:
             p = compute_win_prob(seeds[hi_idx], seeds[lo_idx], team_features, spec)
             hi["cond_win_prob"] = p
             lo["cond_win_prob"] = 1.0 - p
@@ -256,11 +301,15 @@ def _build_r2_matchups(
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
     spec: ModelSpecDict | None = None,
+    matchup_wins: dict[tuple[str, str, int], float | None] | None = None,
 ) -> list[MatchupNode]:
     """Build the two Round 2 matchup dicts for one conference.
 
     NBA bracket pairing: (1/8 winner) vs (4/5 winner), (2/7 winner) vs (3/6 winner).
     Representative team per slot = candidate with highest advancement_prob for R2.
+
+    Win probability priority: direct simulation matchup rate (matchup_wins) >
+    static logit (team_features + spec) > simulation advancement ratio.
 
     Args:
         r1_matchups: Output of _build_r1_matchups (4 matchups: 1v8, 2v7, 3v6, 4v5).
@@ -269,6 +318,7 @@ def _build_r2_matchups(
         logo_url_fn: Callable mapping abbrev -> URL string.
         team_features: Optional DataFrame of raw per-team features (indexed by team).
         spec: Optional model spec dict for direct logit win probability.
+        matchup_wins: Optional dict mapping (team_a, team_b, round) → P(team_a wins).
 
     Returns:
         List of 2 matchup dicts:
@@ -303,7 +353,16 @@ def _build_r2_matchups(
         else:
             hi, lo = rep_b, rep_a
 
-        if team_features is not None and spec is not None:
+        if matchup_wins is not None:
+            p = _direct_matchup_prob(hi["abbrev"], lo["abbrev"], 2, matchup_wins)
+            if p is not None:
+                hi["cond_win_prob"] = p
+                lo["cond_win_prob"] = 1.0 - p
+            elif team_features is not None and spec is not None:
+                p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
+                hi["cond_win_prob"] = p
+                lo["cond_win_prob"] = 1.0 - p
+        elif team_features is not None and spec is not None:
             p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
             hi["cond_win_prob"] = p
             lo["cond_win_prob"] = 1.0 - p
@@ -320,10 +379,14 @@ def _build_r3_matchup(
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
     spec: ModelSpecDict | None = None,
+    matchup_wins: dict[tuple[str, str, int], float | None] | None = None,
 ) -> MatchupNode:
     """Build the conference finals (Round 3) matchup dict.
 
     Representative teams are the R2 participants with highest advancement_prob for R3.
+
+    Win probability priority: direct simulation matchup rate (matchup_wins) >
+    static logit (team_features + spec) > simulation advancement ratio.
 
     Args:
         r2_matchups: Output of _build_r2_matchups (2 matchups).
@@ -332,6 +395,7 @@ def _build_r3_matchup(
         logo_url_fn: Callable mapping abbrev -> URL string.
         team_features: Optional DataFrame of raw per-team features (indexed by team).
         spec: Optional model spec dict for direct logit win probability.
+        matchup_wins: Optional dict mapping (team_a, team_b, round) → P(team_a wins).
 
     Returns:
         Single matchup dict {'high': TeamNode, 'low': TeamNode}.
@@ -355,7 +419,16 @@ def _build_r3_matchup(
     else:
         hi, lo = rep_b, rep_a
 
-    if team_features is not None and spec is not None:
+    if matchup_wins is not None:
+        p = _direct_matchup_prob(hi["abbrev"], lo["abbrev"], 3, matchup_wins)
+        if p is not None:
+            hi["cond_win_prob"] = p
+            lo["cond_win_prob"] = 1.0 - p
+        elif team_features is not None and spec is not None:
+            p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
+            hi["cond_win_prob"] = p
+            lo["cond_win_prob"] = 1.0 - p
+    elif team_features is not None and spec is not None:
         p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
         hi["cond_win_prob"] = p
         lo["cond_win_prob"] = 1.0 - p
@@ -370,10 +443,15 @@ def _build_finals_matchup(
     logo_url_fn: Callable[[str], str],
     team_features: pd.DataFrame | None = None,
     spec: ModelSpecDict | None = None,
+    matchup_wins: dict[tuple[str, str, int], float | None] | None = None,
+    champ_probs: dict[str, float] | None = None,
 ) -> MatchupNode:
     """Build the NBA Finals (Round 4) matchup dict.
 
     Representative teams are the R3 participants with highest advancement_prob for R4.
+
+    Win probability priority: direct simulation matchup rate (matchup_wins) >
+    static logit (team_features + spec) > simulation advancement ratio.
 
     Args:
         east_r3: Output of _build_r3_matchup for East.
@@ -382,6 +460,12 @@ def _build_finals_matchup(
         logo_url_fn: Callable mapping abbrev -> URL string.
         team_features: Optional DataFrame of raw per-team features (indexed by team).
         spec: Optional model spec dict for direct logit win probability.
+        matchup_wins: Optional dict mapping (team_a, team_b, round) → P(team_a wins).
+        champ_probs: Optional dict mapping team abbrev → championship probability.
+            When provided, used to select the Finals representative instead of R4
+            advancement probability, so the displayed finalist aligns with the
+            predicted champion (who is the mode of the championship distribution,
+            not the team that reaches the Finals most often).
 
     Returns:
         Single matchup dict {'high': TeamNode, 'low': TeamNode}.
@@ -398,8 +482,17 @@ def _build_finals_matchup(
         west_r3["low"]["abbrev"]: west_r3["low"]["seed"],
     }
 
-    east_rep = _pick_rep(east_candidates, east_seeds, "east", 4, adv_df, logo_url_fn)
-    west_rep = _pick_rep(west_candidates, west_seeds, "west", 4, adv_df, logo_url_fn)
+    # Use championship probability (not R4 advancement) to pick the Finals
+    # representative: the predicted champion is the mode of who *wins*, not
+    # who *reaches* the Finals most often — the two can differ.
+    if champ_probs is not None:
+        east_best = max(east_candidates, key=lambda t: champ_probs.get(t, 0.0))
+        west_best = max(west_candidates, key=lambda t: champ_probs.get(t, 0.0))
+        east_rep = _build_team_node(east_best, east_seeds[east_best], "east", 4, adv_df, logo_url_fn)
+        west_rep = _build_team_node(west_best, west_seeds[west_best], "west", 4, adv_df, logo_url_fn)
+    else:
+        east_rep = _pick_rep(east_candidates, east_seeds, "east", 4, adv_df, logo_url_fn)
+        west_rep = _pick_rep(west_candidates, west_seeds, "west", 4, adv_df, logo_url_fn)
 
     # For Finals, assign high by regular-season wins — mirrors bracket.py's
     # _make_series tiebreaker when both teams are #1 seeds (tied seed rank).
@@ -419,7 +512,16 @@ def _build_finals_matchup(
             else (west_rep, east_rep)
         )
 
-    if team_features is not None and spec is not None:
+    if matchup_wins is not None:
+        p = _direct_matchup_prob(hi["abbrev"], lo["abbrev"], 4, matchup_wins)
+        if p is not None:
+            hi["cond_win_prob"] = p
+            lo["cond_win_prob"] = 1.0 - p
+        elif team_features is not None and spec is not None:
+            p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
+            hi["cond_win_prob"] = p
+            lo["cond_win_prob"] = 1.0 - p
+    elif team_features is not None and spec is not None:
         p = compute_win_prob(hi["abbrev"], lo["abbrev"], team_features, spec)
         hi["cond_win_prob"] = p
         lo["cond_win_prob"] = 1.0 - p
@@ -440,6 +542,8 @@ def build_bracket_structure(
     predicted_champion: str | None = None,
     team_features: pd.DataFrame | None = None,
     spec: ModelSpecDict | None = None,
+    matchup_wins: dict[tuple[str, str, int], float | None] | None = None,
+    champ_probs: dict[str, float] | None = None,
 ) -> BracketStructure:
     """Build the complete display-ready bracket structure.
 
@@ -452,7 +556,14 @@ def build_bracket_structure(
         team_features: Optional DataFrame of raw per-team features (indexed by team).
             When provided together with spec, win probabilities are computed as
             direct logit model predictions rather than simulation advancement ratios.
+            Used as fallback when matchup_wins has no data for a matchup.
         spec: Optional model spec dict (features, intercept, coefficients).
+        matchup_wins: Optional dict mapping (team_a, team_b, round) → P(team_a wins),
+            where team_a < team_b alphabetically. When provided, used as the primary
+            source for matchup win probabilities (simulation-derived, injury-adjusted).
+        champ_probs: Optional dict mapping team abbrev → championship probability.
+            When provided, the Finals representative is the team with the highest
+            championship probability rather than the highest R4 advancement probability.
 
     Returns:
         Dict with keys:
@@ -462,15 +573,29 @@ def build_bracket_structure(
             'champion': TeamNode for the predicted champion (or None)
     """
     # Build each conference
-    west_r1 = _build_r1_matchups(west_seeds, "west", adv_df, logo_url_fn, team_features, spec)
-    west_r2 = _build_r2_matchups(west_r1, "west", adv_df, logo_url_fn, team_features, spec)
-    west_r3 = _build_r3_matchup(west_r2, "west", adv_df, logo_url_fn, team_features, spec)
+    west_r1 = _build_r1_matchups(
+        west_seeds, "west", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
+    west_r2 = _build_r2_matchups(
+        west_r1, "west", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
+    west_r3 = _build_r3_matchup(
+        west_r2, "west", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
 
-    east_r1 = _build_r1_matchups(east_seeds, "east", adv_df, logo_url_fn, team_features, spec)
-    east_r2 = _build_r2_matchups(east_r1, "east", adv_df, logo_url_fn, team_features, spec)
-    east_r3 = _build_r3_matchup(east_r2, "east", adv_df, logo_url_fn, team_features, spec)
+    east_r1 = _build_r1_matchups(
+        east_seeds, "east", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
+    east_r2 = _build_r2_matchups(
+        east_r1, "east", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
+    east_r3 = _build_r3_matchup(
+        east_r2, "east", adv_df, logo_url_fn, team_features, spec, matchup_wins
+    )
 
-    finals = _build_finals_matchup(east_r3, west_r3, adv_df, logo_url_fn, team_features, spec)
+    finals = _build_finals_matchup(
+        east_r3, west_r3, adv_df, logo_url_fn, team_features, spec, matchup_wins, champ_probs
+    )
 
     # Champion node
     champion: TeamNode | None = None

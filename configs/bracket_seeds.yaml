@@ -255,8 +255,8 @@ bracket_seeds:
 
   2026:
     # East: DET 1 (60-22), BOS 2 (55-26), NYK 3 (53-29), CLE 4 (52-30),
-    #        TOR 5 (46-36), ATL 6 (46-36), PHI 7, ORL 8  (seeds 7-8 = pre-play-in standings)
+    #        TOR 5 (46-36), ATL 6 (46-36), PHI 7 (45-37), ORL 8 (45-37)
     east: [DET, BOS, NYK, CLE, TOR, ATL, PHI, ORL]
     # West: OKC 1 (64-18), SAS 2 (62-20), DEN 3 (54-28), LAL 4 (53-29),
-    #        HOU 5 (52-30), MIN 6 (49-33), PHO 7, POR 8  (seeds 7-8 = pre-play-in standings)
-    west: [OKC, SAS, DEN, LAL, HOU, MIN, PHO, POR]
+    #        HOU 5 (52-30), MIN 6 (49-33), POR 7 (42-40), PHO 8 (45-37)
+    west: [OKC, SAS, DEN, LAL, HOU, MIN, POR, PHO]

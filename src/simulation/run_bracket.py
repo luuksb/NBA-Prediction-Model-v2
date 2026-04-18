@@ -74,6 +74,7 @@ def run_simulations(
     for i in range(n_sims):
         bracket = build_bracket(year, list(east_seeds), list(west_seeds), team_wins=team_wins)
         round_exits: dict[str, int] = {}
+        series_results: list[dict] = []
 
         while True:
             current_round = bracket.rounds[-1]
@@ -92,6 +93,12 @@ def run_simulations(
                 series.winner = winner
                 loser = series.low_seed if winner == series.high_seed else series.high_seed
                 round_exits[loser] = series.round_num
+                series_results.append({
+                    "team_a": series.high_seed,
+                    "team_b": series.low_seed,
+                    "round": series.round_num,
+                    "winner": winner,
+                })
 
             result = advance_bracket(bracket)
             if result is None:
@@ -135,6 +142,7 @@ def run_simulations(
                 "finalist_east_injuries": finalist_east_injuries,
                 "finalist_west_injuries": finalist_west_injuries,
                 "round_exits": round_exits,
+                "series_results": series_results,
             }
         )
 

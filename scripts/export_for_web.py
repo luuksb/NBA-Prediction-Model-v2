@@ -482,6 +482,7 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
     summary = results["summary"]
     adv_df = results["round_advancement"]
     champ_df = results["championship_probs"]
+    matchup_wins = results.get("matchup_wins") or None
 
     seeds = load_bracket_seeds(year)
     spec = load_model_spec(window)
@@ -489,6 +490,11 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
     metrics = load_model_metrics(spec["features"], window)
     insample_fit = compute_insample_fit(window, spec)
     injury_impact = load_injury_impact(run_id)
+
+    champ_probs = {
+        str(row["team"]): float(row["championship_prob"])
+        for _, row in champ_df.iterrows()
+    }
 
     bracket = build_bracket_structure(
         east_seeds=seeds["east"],
@@ -498,6 +504,8 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
         predicted_champion=summary.get("predicted_champion"),
         team_features=team_features if not team_features.empty else None,
         spec=spec,
+        matchup_wins=matchup_wins,
+        champ_probs=champ_probs,
     )
 
     teams: dict[str, Any] = {}
@@ -512,11 +520,6 @@ def export_run(run_id: str, output_path: str) -> dict[str, Any]:
                 "color_primary": colors[0],
                 "color_secondary": colors[1],
             }
-
-    champ_probs = {
-        str(row["team"]): float(row["championship_prob"])
-        for _, row in champ_df.iterrows()
-    }
 
     _window_labels = {"modern": "2000–2024", "full": "1980–2024", "recent": "2014–2024"}
     window_label = f"{window} ({_window_labels.get(window, window)})"
